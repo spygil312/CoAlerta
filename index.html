@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CoAlerta | Seguridad para tu comunidad</title>
+
+    <!-- Fuente -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Iconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="css/estilos.css?v=20261028-profile-ui-2">
+    <link rel="stylesheet" href="css/index.css">
+    <link rel="stylesheet" href="css/responsive.css">
+    <script src="js/tema.js?v=20261028-auth-theme"></script>
+</head>
+
+<body>
+    <!-- =====================================================
+         HEADER
+    ====================================================== -->
+    <header class="header">
+        <div class="contenedor header-contenido">
+
+            <!-- LOGO -->
+            <a href="index.html" class="logo" aria-label="Co Alerta, inicio">
+                <div class="logo-icono">
+                    <i class="fa-solid fa-shield-halved"></i>
+                </div>
+
+                <div class="logo-texto">
+                    <span class="logo-co">Co</span>
+                    <span class="logo-alerta">Alerta</span>
+                </div>
+            </a>
+
+            <!-- =================================================
+                 MENÚ PARA PC
+            ================================================== -->
+            <nav class="menu">
+                <a href="index.html" class="activo"> Inicio </a>
+                <a href="#como-funciona"> Cómo funciona </a>
+                <a href="#seguridad"> Seguridad </a>
+                <a href="#beneficios"> Beneficios </a>
+                <a href="#contacto"> Contacto</a>
+            </nav>
+
+            <!-- =================================================
+                 BOTONES DEL HEADER
+            ================================================== -->
+            <div class="header-botones">
+                <a href="pages/login.html" class="btn-login"> Iniciar sesión </a>
+                <a href="pages/registro.html" class="btn-registro"> Crear cuenta </a>
+            </div>
+
+            <!-- =================================================
+                 BOTÓN HAMBURGUESA MOBILE
+            ================================================== -->
+            <button
+                class="menu-mobile"
+                id="btnMenu"
+                type="button"
+                aria-label="Abrir menú"
+                aria-expanded="false"
+                aria-controls="menuMobile"
+            >
+                <i class="fa-solid fa-bars"></i>
+            </button>
+        </div>
+
+        <!-- =====================================================
+             MENÚ MOBILE
+        ====================================================== -->
+        <nav class="menu-mobile-contenido" id="menuMobile" aria-label="Menú principal móvil">
+            <a href="index.html"> Inicio </a>
+            <a href="#como-funciona"> Cómo funciona </a>
+            <a href="#seguridad"> Seguridad </a>
+            <a href="#beneficios"> Beneficios </a>
+            <a href="#contacto"> Contacto </a>
+            <a href="pages/login.html"> Iniciar sesión </a>
+            <a href="pages/registro.html" class="mobile-registro">
+                Crear cuenta
+            </a>
+        </nav>
+    </header>
+
+    <!-- =====================================================
+         CONTENIDO PRINCIPAL
+    ====================================================== -->
+    <main>
+        <!-- =================================================
+             PORTADA / HERO
+        ================================================== -->
+        <section class="hero">
+            <div class="contenedor hero-contenido">
+                <!-- =============================================
+                     TEXTO
+                ============================================== -->
+                <div class="hero-texto">
+                    <div class="etiqueta">
+                        <i class="fa-solid fa-shield"></i>
+                        Seguridad comunitaria inteligente
+                    </div>
+
+                    <h1>
+                        Tu comunidad más
+                        <span> segura y conectada </span>
+                    </h1>
+
+                    <p>
+                        Reporta emergencias rápidamente,
+                        comparte tu ubicación automáticamente
+                        y recibe confirmación cuando la ayuda
+                        esté en camino.
+                    </p>
+
+                    <!-- BOTONES -->
+                    <div class="hero-botones">
+                        <a href="pages/registro.html" class="btn-principal">
+                            Comenzar ahora
+                            <i class="fa-solid fa-arrow-right"></i>
+                        </a>
+
+                        <a href="#como-funciona" class="btn-secundario">
+                            <i class="fa-solid fa-circle-play"></i>
+                            Cómo funciona
+                        </a>
+                    </div>
+
+                    <!-- INDICADORES -->
+                    <div class="hero-seguridad">
+                        <div class="seguridad-item">
+                            <i class="fa-solid fa-lock"></i>
+                            <span> Datos protegidos </span>
+                        </div>
+
+                        <div class="seguridad-item">
+                            <i class="fa-solid fa-location-dot"></i>
+                            <span> GPS automático </span>
+
+                        </div>
+
+                        <div class="seguridad-item">
+                            <i class="fa-solid fa-bolt"></i>
+                            <span> Alertas rápidas </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- =============================================
+                     PANEL DE EJEMPLO
+                ============================================== -->
+                <div class="hero-panel">
+                    <div class="panel-app">
+
+                        <!-- CABECERA -->
+                        <div class="panel-header">
+                            <div>
+                                <span class="estado-punto"></span>
+                                Sistema activo
+                            </div>
+                            <i class="fa-solid fa-bell"></i>
+                        </div>
+
+                        <!-- UBICACIÓN -->
+                        <div class="ubicacion-card">
+                            <div class="ubicacion-icono">
+                                <i class="fa-solid fa-location-dot"></i>
+                            </div>
+
+                            <div>
+                                <span class="ubicacion-titulo">
+                                    Tu ubicación
+                                </span>
+                                <strong> Zona monitoreada </strong>
+                            </div>
+                        </div>
+
+                        <!-- PREGUNTA -->
+                        <div class="emergencia-titulo">
+                            <span> ¿Qué está ocurriendo? </span>
+                            <small> Selecciona una opción </small>
+                        </div>
+
+                        <!-- BOTONES DE ALERTA -->
+                        <div class="alertas-grid">
+                            <button class="alerta-card robo">
+                                <div class="alerta-icono">
+                                    <i class="fa-solid fa-mask-face"></i>
+                                </div>
+                                <span> Robo </span>
+                            </button>
+
+                            <button class="alerta-card sospechoso">
+                                <div class="alerta-icono">
+                                    <i class="fa-solid fa-user-secret"></i>
+                                </div>
+                                <span> Sospechoso </span>
+                            </button>
+
+                            <button class="alerta-card accidente">
+                                <div class="alerta-icono">
+                                    <i class="fa-solid fa-truck-medical"></i>
+                                </div>
+                                <span> Accidente </span>
+                            </button>
+                        </div>
+
+                        <!-- ESTADO DE ZONA -->
+                        <div class="zona-segura">
+                            <div class="zona-icono">
+                                <i class="fa-solid fa-shield-halved"></i>
+                            </div>
+
+                            <div>
+                                <strong> Zona monitoreada </strong>
+                                <span> Seguridad disponible </span>
+                            </div>
+
+                            <div class="estado-online">
+                                Online
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- =================================================
+             BENEFICIOS
+        ================================================== -->
+        <section class="beneficios" id="beneficios">
+            <div class="contenedor">
+                <div class="titulo-seccion">
+                    <span> Protección inteligente </span>
+                    <h2> Todo lo que necesitas para sentirte seguro </h2>
+
+                    <p>
+                        CoAlerta conecta vecinos, coordinadores
+                        y personal de seguridad desde una
+                        plataforma sencilla y rápida.
+                    </p>
+                </div>
+
+                <div class="beneficios-grid">
+
+                    <!-- BENEFICIO 1 -->
+                    <article class="beneficio-card">
+                        <div class="beneficio-icono">
+                            <i class="fa-solid fa-bolt"></i>
+                        </div>
+                        <h3> Alertas rápidas  </h3>
+
+                        <p>
+                            Reporta una emergencia en pocos
+                            segundos sin necesidad de escribir
+                            mensajes largos.
+                        </p>
+                    </article>
+
+                    <!-- BENEFICIO 2 -->
+                    <article class="beneficio-card">
+                        <div class="beneficio-icono">
+                            <i class="fa-solid fa-location-crosshairs"></i>
+                        </div>
+
+                        <h3> Ubicación automática </h3>
+
+                        <p>
+                            El sistema obtiene tu ubicación GPS
+                            automáticamente al generar una alerta.
+                        </p>
+                    </article>
+
+                    <!-- BENEFICIO 3 -->
+                    <article class="beneficio-card">
+                        <div class="beneficio-icono">
+                            <i class="fa-solid fa-shield-halved"></i>
+                        </div>
+                        <h3> Comunidad protegida </h3>
+
+                        <p>
+                            Los vecinos y autoridades pueden
+                            visualizar alertas activas en tiempo real.
+                        </p>
+                    </article>
+
+                    <!-- BENEFICIO 4 -->
+                    <article class="beneficio-card">
+                        <div class="beneficio-icono">
+                            <i class="fa-solid fa-circle-check"></i>
+                        </div>
+                        <h3> Confirmación inmediata </h3>
+
+                        <p>
+                            Recibe una confirmación cuando
+                            seguridad haya recibido tu alerta.
+                        </p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <!-- =================================================
+             CÓMO FUNCIONA
+        ================================================== -->
+        <section class="como-funciona" id="como-funciona">
+            <div class="contenedor">
+                <div class="titulo-seccion">
+                    <span> Simple y rápido </span>
+                    <h2> ¿Cómo funciona CoAlerta? </h2>
+
+                    <p>
+                        Diseñado para ayudarte a comunicar
+                        una emergencia con el menor número
+                        de pasos posible.
+                    </p>
+                </div>
+
+                <div class="pasos">
+
+                    <!-- PASO 1 -->
+                    <div class="paso">
+                        <div class="paso-numero">
+                            1
+                        </div>
+
+                        <div class="paso-icono">
+                            <i class="fa-solid fa-mobile-screen-button"></i>
+                        </div>
+
+                        <h3> Selecciona la emergencia </h3>
+
+                        <p>
+                            Presiona el tipo de emergencia
+                            que está ocurriendo.
+                        </p>
+                    </div>
+
+                    <div class="paso-linea"></div>
+
+                    <!-- PASO 2 -->
+                    <div class="paso">
+                        <div class="paso-numero">
+                            2
+                        </div>
+
+                        <div class="paso-icono">
+                            <i class="fa-solid fa-location-dot"></i>
+                        </div>
+
+                        <h3> Enviamos tu ubicación </h3>
+
+                        <p>
+                            CoAlerta obtiene automáticamente
+                            tu ubicación actual.
+                        </p>
+                    </div>
+
+                    <div class="paso-linea"></div>
+
+                    <!-- PASO 3 -->
+                    <div class="paso">
+                        <div class="paso-numero">
+                            3
+                        </div>
+
+                        <div class="paso-icono">
+                            <i class="fa-solid fa-car-side"></i>
+                        </div>
+
+                        <h3> La ayuda va en camino </h3>
+
+                        <p>
+                            El personal de seguridad recibe
+                            la alerta y confirma la atención.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- =================================================
+             SEGURIDAD
+        ================================================== -->
+        <section class="seguridad" id="seguridad">
+            <div class="contenedor seguridad-contenido">
+
+                <!-- INFORMACIÓN -->
+                <div class="seguridad-info">
+                    <span class="subtitulo">
+                        Tu información protegida
+                    </span>
+
+                    <h2> Diseñado pensando en tu seguridad </h2>
+
+                    <p>
+                        La privacidad y protección de los usuarios
+                        es una prioridad. CoAlerta busca mantener
+                        la información segura durante el envío
+                        y recepción de alertas.
+                    </p>
+
+                    <div class="seguridad-lista">
+                        <div>
+                            <i class="fa-solid fa-circle-check"></i>
+                            <span> Protección de información personal </span>
+                        </div>
+
+                        <div>
+                            <i class="fa-solid fa-circle-check"></i>
+                            <span> Acceso según tipo de usuario </span>
+                        </div>
+
+                        <div>
+                            <i class="fa-solid fa-circle-check"></i>
+                            <span> Ubicación utilizada para emergencias </span>
+                        </div>
+
+                        <div>
+                            <i class="fa-solid fa-circle-check"></i>
+                            <span> Comunicación rápida con seguridad </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TARJETA -->
+                <div class="seguridad-card">
+                    <div class="escudo-grande">
+                        <i class="fa-solid fa-shield-halved"></i>
+                    </div>
+                    <h3> Tu comunidad protegida </h3>
+
+                    <p>
+                        Tecnología diseñada para facilitar
+                        una respuesta rápida ante situaciones
+                        de emergencia.
+                    </p>
+
+                    <div class="seguridad-status">
+                        <span></span>
+                        Sistema operativo
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- =================================================
+             CTA
+        ================================================== -->
+        <section class="cta">
+            <div class="contenedor cta-contenido">
+                <div>
+                    <h2> Protege a tu comunidad con CoAlerta </h2>
+                    <p>
+                        Únete a una red de vecinos conectados
+                        para responder más rápido ante emergencias.
+                    </p>
+                </div>
+
+                <a href="pages/registro.html" class="btn-cta">
+                    Crear cuenta gratis
+                    <i class="fa-solid fa-arrow-right"></i>
+                </a>
+            </div>
+        </section>
+    </main>
+
+    <!-- =====================================================
+         FOOTER
+    ====================================================== -->
+    <footer class="footer" id="contacto">
+        <div class="contenedor footer-grid">
+            
+            <!-- MARCA -->
+            <div class="footer-marca">
+                <a href="index.html" class="logo" aria-label="Co Alerta, inicio">
+
+                    <div class="logo-icono">
+                        <i class="fa-solid fa-shield-halved"></i>
+                    </div>
+                    <div class="logo-texto">
+                        <span class="logo-co">Co</span>
+                        <span class="logo-alerta">Alerta</span>
+                    </div>
+                </a>
+                <p>
+                    Tecnología para comunidades más
+                    seguras, conectadas y preparadas.
+                </p>
+            </div>
+
+            <!-- PLATAFORMA -->
+            <div class="footer-columna">
+                <h4> Plataforma </h4>
+                <a href="#como-funciona"> Cómo funciona</a>
+                <a href="#beneficios">Beneficios</a>
+                <a href="#seguridad">Seguridad</a>
+            </div>
+
+            <!-- CUENTA -->
+            <div class="footer-columna">
+                <h4> Cuenta </h4>
+                <a href="pages/login.html">Iniciar sesión</a>
+                <a href="pages/registro.html">Crear cuenta</a>
+            </div>
+
+            <!-- CONTACTO -->
+            <div class="footer-columna">
+                <h4> Contacto </h4>
+
+                <a href="mailto:contacto@coalerta.pe">
+                    <i class="fa-solid fa-envelope"></i>
+                    contacto@coalerta.pe
+                </a>
+            </div>
+        </div>
+
+        <div class="footer-bottom">
+            <div class="contenedor">
+                <p> © 2026 CoAlerta. Todos los derechos reservados. </p>
+            </div>
+        </div>
+    </footer>
+    <script type="module" src="js/app.js?v=modular-sdk-1"></script>
+</body>
+</html>
