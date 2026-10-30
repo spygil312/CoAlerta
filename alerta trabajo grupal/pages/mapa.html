@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapa de alertas | CoAlerta</title>
+
+    <!-- FUENTE -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- ICONOS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+    <!-- LEAFLET CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="../css/estilos.css?v=20261028-profile-ui-2">
+    <link rel="stylesheet" href="../css/responsive.css">
+    <link rel="stylesheet" href="../css/mapa.css?v=ordered-panels-gps-dispatch-20261029">
+    <link rel="stylesheet" href="../css/alertas.css">
+    <script src="../js/tema.js?v=20261029-theme-scroll"></script>
+</head>
+
+<body class="pagina-mapa" data-role-navigation-ready="false">
+
+    <!-- =====================================================
+         HEADER
+    ====================================================== -->
+    <header class="mapa-header">
+        <div class="mapa-header-contenido">
+
+            <!-- LOGO -->
+            <a href="../index.html" class="logo" aria-label="Co Alerta, inicio">
+                <div class="logo-icono">
+                    <i class="fa-solid fa-shield-halved"></i>
+                </div>
+                <div class="logo-texto">
+                    <span class="logo-co">Co</span><span class="logo-alerta">Alerta</span>
+                </div>
+            </a>
+
+            <!-- ESTADO -->
+            <div class="mapa-header-centro">
+                <div class="estado-sistema">
+                    <span class="estado-punto"></span>
+                    <span id="estadoSistemaMapa">Sin sesión</span>
+                </div>
+            </div>
+
+            <!-- DERECHA -->
+            <div class="mapa-header-derecha">
+                <button class="boton-header" type="button" id="btnNotificaciones" title="Notificaciones" aria-label="Notificaciones" aria-expanded="false" aria-controls="menuNotificaciones">
+                    <i class="fa-solid fa-bell"></i>
+                    <span class="notificacion-contador" hidden></span>
+                </button>
+
+                <!-- Menú oculto de notificaciones -->
+                <div id="menuNotificaciones" class="menu-notificaciones" hidden>
+                    <h4>Notificaciones</h4>
+                    <div class="notificacion-contenido" id="notificacionesLista" aria-live="polite">
+                        Abre las notificaciones para consultar alertas cercanas usando tu ubicación.
+                    </div>
+                </div>
+                <a class="boton-header" title="Perfil" aria-label="Mi perfil" href="perfil.html">
+                    <i class="fa-solid fa-user"></i>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- =====================================================
+         LAYOUT PRINCIPAL
+    ====================================================== -->
+    <main class="mapa-layout">
+
+        <!-- =================================================
+             SIDEBAR
+        ================================================== -->
+        <aside class="mapa-sidebar">
+            
+            <!-- USUARIO -->
+            <div class="sidebar-usuario">
+                <div class="usuario-avatar" id="sidebarAvatarContainer">
+                    <i class="fa-solid fa-user" id="sidebarAvatarIcon"></i>
+                    <img id="sidebarAvatarImg" alt="Foto de perfil" hidden>
+                </div>
+                <div>
+                    <strong id="sidebarNombre">Hola, usuario</strong>
+                    <span id="sidebarRol">Vecino</span>
+                </div>
+            </div>
+
+            <!-- MENÚ -->
+            <nav class="sidebar-menu">
+                <a href="mapa.html" class="activo">
+                    <i class="fa-solid fa-map-location-dot"></i>
+                    <span>Mapa</span>
+                </a>
+                <a href="historial.html">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                    <span>Historial</span>
+                </a>
+                <a href="comunidad.html">
+                    <i class="fa-solid fa-users"></i>
+                    <span>Mi comunidad</span>
+                </a>
+                <a href="perfil.html">
+                    <i class="fa-solid fa-user-gear"></i>
+                    <span>Mi perfil</span>
+                </a>
+                <a href="administracion.html" data-admin-only hidden>
+                    <i class="fa-solid fa-user-shield" aria-hidden="true"></i>
+                    <span>Administración</span>
+                </a>
+                <a href="coordinador_vecinal.html" data-role-link="coordinator" hidden>
+                    <i class="fa-solid fa-tower-broadcast"></i>
+                    <span>Panel de coordinación</span>
+                </a>
+                <a href="personal_seguridad.html" data-role-link="security" hidden>
+                    <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
+                    <span>Panel de seguridad</span>
+                </a>
+            </nav>
+
+            <!-- ESTADO -->
+            <div class="sidebar-estado">
+                <div class="sidebar-estado-icono">
+                    <i class="fa-solid fa-shield-halved"></i>
+                </div>
+                <div>
+                    <strong id="estadoOperacionTitulo">Conexión requerida</strong>
+                    <span id="estadoOperacionDetalle">Inicia sesión para ver alertas en tiempo real.</span>
+                </div>
+            </div>
+
+            <!-- CERRAR SESIÓN -->
+            <a href="login.html" class="cerrar-sesion" id="btnCerrarSesionLateral">
+                <i class="fa-solid fa-right-from-bracket"></i>
+                Cerrar sesión
+            </a>
+
+        </aside>
+
+        <!-- =================================================
+             CONTENIDO
+        ================================================== -->
+        <section class="mapa-contenido">
+
+            <!-- CABECERA -->
+            <div class="mapa-superior">
+                <div>
+                    <h1>Mapa de seguridad</h1>
+                    <p>Revisa las alertas activas cerca de tu ubicación.</p>
+                </div>
+                <div class="mapa-superior-acciones">
+                    <button class="btn-filtro" type="button" id="btnFiltros" aria-expanded="false" aria-controls="panelFiltros">
+                        <i class="fa-solid fa-sliders"></i>
+                        <span>Filtros</span>
+                    </button>
+                    <button class="btn-mi-ubicacion" id="btnMiUbicacion">
+                        <i class="fa-solid fa-location-crosshairs"></i>
+                        Mi ubicación
+                    </button>
+                </div>
+            </div>
+
+            <section class="mapa-filtros" id="panelFiltros" aria-label="Filtros de alertas" hidden>
+                <strong>Mostrar alertas</strong>
+                <label><input type="checkbox" value="robo" checked> Robo</label>
+                <label><input type="checkbox" value="sospechoso" checked> Sospechoso</label>
+                <label><input type="checkbox" value="incendio" checked> Incendio</label>
+                <label><input type="checkbox" value="accidente" checked> Accidente</label>
+                <label for="filtroTiempoMapa">Periodo</label>
+                <select id="filtroTiempoMapa" aria-label="Filtrar alertas por periodo">
+                    <option value="all">Todos</option>
+                    <option value="hour">Última hora</option>
+                    <option value="today">Hoy</option>
+                    <option value="week">Última semana</option>
+                </select>
+                <button class="btn-filtro" type="button" id="btnModoOscuroMapa">Modo nocturno</button>
+            </section>
+
+            <!-- =================================================
+                 ESTADÍSTICAS
+            ================================================== -->
+            <div class="mapa-estadisticas">
+                <div class="estadistica-card">
+                    <div class="estadistica-icono verde">
+                        <i class="fa-solid fa-shield-halved"></i>
+                    </div>
+                    <div>
+                        <span>Estado</span>
+                        <strong id="estadoBackendMapa">Sin sesión</strong>
+                    </div>
+                </div>
+
+                <div class="estadistica-card">
+                    <div class="estadistica-icono rojo">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                    </div>
+                    <div>
+                        <span>Alertas activas</span>
+                        <strong id="contadorAlertas">0</strong>
+                    </div>
+                </div>
+
+                <div class="estadistica-card">
+                    <div class="estadistica-icono azul">
+                        <i class="fa-solid fa-car-side"></i>
+                    </div>
+                    <div>
+                        <span>Unidades disponibles</span>
+                        <strong id="contadorUnidades">0</strong>
+                    </div>
+                </div>
+            </div>
+
+            <!-- =================================================
+                 MAPA + PANEL
+            ================================================== -->
+            <div class="mapa-principal-grid">
+
+                <!-- MAPA -->
+                <div class="mapa-card">
+                    <div class="mapa-imagen-contenedor">
+                        <!-- Aquí se inyectará el mapa de Leaflet -->
+                        <div id="mapaInteractivo" role="application" aria-label="Mapa de alertas de seguridad"></div>
+                    </div>
+                    <p class="mapa-tile-error" id="mapaTileError" role="status" hidden></p>
+
+                    <div class="mapa-leyenda">
+                        <div>
+                            <span class="leyenda-punto rojo"></span>
+                            Robo
+                        </div>
+                        <div>
+                            <span class="leyenda-punto amarillo"></span>
+                            Sospechoso
+                        </div>
+                        <div>
+                            <span class="leyenda-punto naranja"></span>
+                            Incendio
+                        </div>
+                        <div>
+                            <span class="leyenda-punto azul"></span>
+                            Accidente
+                        </div>
+                        <div>
+                            <i class="fa-solid fa-user-shield leyenda-serenazgo" aria-hidden="true"></i>
+                            Serenazgo
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PANEL DE ALERTAS -->
+                <aside class="alertas-panel">
+                    <div class="alertas-panel-handle" aria-hidden="true"><span></span></div>
+                    <div class="alertas-panel-header">
+                        <div>
+                            <h2>Alertas cercanas</h2>
+                            <span>Incidentes activos y respuesta a tus reportes</span>
+                        </div>
+                        <div class="alertas-panel-acciones">
+                            <button class="alertas-expandir" type="button" id="btnExpandirAlertas"
+                                aria-expanded="false" aria-controls="alertasLista" aria-label="Mostrar alertas cercanas">
+                                <span class="alertas-expandir-texto">
+                                    <strong>Alertas cercanas</strong>
+                                    <small>Ver todas</small>
+                                </span>
+                                <i class="fa-solid fa-chevron-up" aria-hidden="true"></i>
+                            </button>
+                            <button class="btn-actualizar" type="button" id="btnActualizar" title="Actualizar" aria-label="Actualizar alertas">
+                                <i class="fa-solid fa-rotate" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <p class="estado-actualizar-alertas" id="estadoActualizarAlertas" aria-live="polite"></p>
+
+                    <section class="estado-respuesta-vecino" id="estadoRespuestaVecino" hidden aria-live="assertive">
+                        <strong id="estadoRespuestaTitulo"></strong>
+                        <p id="estadoRespuestaDetalle"></p>
+                    </section>
+                    <div class="alertas-lista" id="alertasLista"></div>
+                </aside>
+
+            </div>
+        </section>
+    </main>
+
+    <!-- =====================================================
+         BOTÓN FLOTANTE
+    ====================================================== -->
+    <button class="boton-emergencia-flotante" type="button" id="btnEmergencia"
+        title="Reportar emergencia" aria-label="Reportar emergencia">
+        <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+        <span>Reportar emergencia</span>
+    </button>
+
+    <!-- =====================================================
+         MODAL EMERGENCIA
+    ====================================================== -->
+    <div class="modal-fondo" id="modalEmergencia">
+        <div class="modal-emergencia">
+            <button class="modal-cerrar" type="button" id="cerrarModal" aria-label="Cerrar">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+
+            <div class="modal-header">
+                <div class="modal-icono">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+                <h2>Reportar emergencia</h2>
+                <p>Selecciona lo que está ocurriendo.</p>
+                <p class="aviso-envio-alerta">La alerta se enviará al servidor junto con tu ubicación GPS.</p>
+            </div>
+
+            <div class="detalle-emergencia">
+                <label for="detalleEmergencia">Detalle breve (opcional)</label>
+                <textarea id="detalleEmergencia" rows="3" maxlength="300"
+                    placeholder="Describe lo ocurrido: características, tipo de transporte, daños u otra información útil."></textarea>
+                <small><span id="contadorDetalleEmergencia">0</span>/300 caracteres. No incluyas datos personales.</small>
+            </div>
+
+            <div class="modal-alertas-grid">
+                <button class="modal-alerta-btn" data-emergencia="Robo">
+                    <div class="modal-alerta-icono robo">
+                        <i class="fa-solid fa-mask-face"></i>
+                    </div>
+                    <span>Robo</span>
+                </button>
+
+                <button class="modal-alerta-btn" data-emergencia="Persona sospechosa">
+                    <div class="modal-alerta-icono sospechoso">
+                        <i class="fa-solid fa-user-secret"></i>
+                    </div>
+                    <span>Sospechoso</span>
+                </button>
+
+                <button class="modal-alerta-btn" data-emergencia="Accidente">
+                    <div class="modal-alerta-icono accidente">
+                        <i class="fa-solid fa-truck-medical"></i>
+                    </div>
+                    <span>Accidente</span>
+                </button>
+
+                <button class="modal-alerta-btn" data-emergencia="Incendio">
+                    <div class="modal-alerta-icono incendio">
+                        <i class="fa-solid fa-fire"></i>
+                    </div>
+                    <span>Incendio</span>
+                </button>
+            </div>
+
+            <section class="confirmacion-cuenta-regresiva" id="confirmacionCuentaRegresiva" hidden aria-live="assertive">
+                <strong id="cuentaRegresivaNumero">3</strong>
+                <p>Enviando alerta en</p>
+                <div class="cuenta-regresiva-barra"><span id="cuentaRegresivaProgreso"></span></div>
+                <button type="button" class="btn-cancelar-alerta" id="btnCancelarAlerta">CANCELAR</button>
+            </section>
+            <p class="estado-envio-alerta" id="estadoEnvioAlerta" hidden aria-live="polite"></p>
+
+            <div class="modal-ubicacion">
+                <i class="fa-solid fa-location-dot"></i>
+                <div>
+                    <strong>Tu ubicación será enviada automáticamente</strong>
+                    <span>CoAlerta utilizará tu GPS para ubicar el incidente.</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- =====================================================
+         MENÚ MOBILE
+    ====================================================== -->
+    <nav class="menu-inferior-mobile" aria-label="Navegación móvil">
+        <a href="mapa.html" class="activo" aria-current="page">
+            <i class="fa-solid fa-map-location-dot" aria-hidden="true"></i>
+            <span>Mapa</span>
+        </a>
+        <a href="historial.html">
+            <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i>
+            <span>Historial</span>
+        </a>
+        <a href="comunidad.html">
+            <i class="fa-solid fa-users" aria-hidden="true"></i>
+            <span>Comunidad</span>
+        </a>
+        <a href="perfil.html">
+            <i class="fa-solid fa-user" aria-hidden="true"></i>
+            <span>Perfil</span>
+        </a>
+        <a href="coordinador_vecinal.html" data-role-link="coordinator" hidden>
+            <i class="fa-solid fa-tower-broadcast" aria-hidden="true"></i><span>Coordinación</span>
+        </a>
+        <a href="personal_seguridad.html" data-role-link="security" hidden>
+            <i class="fa-solid fa-shield-halved" aria-hidden="true"></i><span>Seguridad</span>
+        </a>
+        <a href="administracion.html" data-admin-only hidden>
+            <i class="fa-solid fa-user-shield" aria-hidden="true"></i><span>Admin</span>
+        </a>
+    </nav>
+
+    <!-- =====================================================
+         JAVASCRIPT
+    ====================================================== -->
+    <!-- 1. Leaflet (Mapa) -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- 2. Firebase modular -->
+    <script type="module" src="../js/estado-cuenta.js?v=modular-sdk-1"></script>
+    <script src="../js/ubicacion.js"></script>
+    <script src="../js/notificaciones.js?v=20261029-notifications-read-v2"></script>
+    <script type="module" src="../js/coalerta-data.js?v=notice-history-audit-20261030"></script>
+    <script type="module" src="../js/mapa.js?v=map-container-clip-20261029"></script>
+    <script src="../js/alertas.js?v=20261029-notifications-read-v2"></script>
+</body>
+</html>

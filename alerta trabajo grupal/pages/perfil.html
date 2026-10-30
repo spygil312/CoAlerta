@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#168A5B">
+    <title>Mi perfil | CoAlerta</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="../css/estilos.css?v=20261028-profile-ui-2">
+    <link rel="stylesheet" href="../css/responsive.css">
+    <link rel="stylesheet" href="../css/mapa.css?v=ordered-panels-gps-dispatch-20261029">
+    <link rel="stylesheet" href="../css/perfil.css?v=20261030-mobile-scroll">
+    <script src="../js/tema.js?v=20261029-theme-scroll"></script>
+</head>
+
+<body class="pagina-perfil" data-role-navigation-ready="false">
+    <header class="mapa-header">
+        <div class="mapa-header-contenido">
+            <a href="../index.html" class="logo" aria-label="Co Alerta, inicio">
+                <span class="logo-icono"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i></span>
+                <span class="logo-texto"><span class="logo-co">Co</span><span class="logo-alerta">Alerta</span></span>
+            </a>
+
+            <div class="mapa-header-centro">
+                <div class="estado-sistema">
+                    <span class="estado-punto" aria-hidden="true"></span>
+                    Conectado a CoAlerta
+                </div>
+            </div>
+
+            <div class="mapa-header-derecha">
+                <button class="boton-header" type="button" id="btnNotificaciones"
+                    title="Notificaciones" aria-label="Notificaciones" aria-expanded="false"
+                    aria-controls="menuNotificaciones">
+                    <i class="fa-solid fa-bell" aria-hidden="true"></i>
+                    <span class="notificacion-contador" hidden></span>
+                </button>
+                <div id="menuNotificaciones" class="menu-notificaciones" hidden>
+                    <h4>Notificaciones</h4>
+                    <div class="notificacion-contenido" id="notificacionesLista" aria-live="polite">
+                        Solicitando permiso para detectar alertas cercanas...
+                    </div>
+                </div>
+                <a class="boton-header" title="Perfil" aria-label="Mi perfil" href="perfil.html">
+                    <i class="fa-solid fa-user" aria-hidden="true"></i>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main class="mapa-layout">
+        <aside class="mapa-sidebar" aria-label="Navegación principal">
+            <div class="sidebar-usuario">
+                <div class="usuario-avatar" id="sidebarAvatarContainer">
+                    <i class="fa-solid fa-user" id="sidebarAvatarIcon" aria-hidden="true"></i>
+                    <img id="sidebarAvatarImg" alt="Foto de perfil" hidden>
+                </div>
+                <div class="sidebar-usuario-datos">
+                    <strong id="sidebarNombre">Cargando...</strong>
+                    <span id="sidebarRol">Vecino</span>
+                </div>
+            </div>
+
+            <nav class="sidebar-menu">
+                <a href="mapa.html">
+                    <i class="fa-solid fa-map-location-dot" aria-hidden="true"></i><span>Mapa</span>
+                </a>
+                <a href="historial.html">
+                    <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i><span>Historial</span>
+                </a>
+                <a href="comunidad.html">
+                    <i class="fa-solid fa-users" aria-hidden="true"></i><span>Mi comunidad</span>
+                </a>
+                <a href="perfil.html" class="activo" aria-current="page">
+                    <i class="fa-solid fa-user-gear" aria-hidden="true"></i><span>Mi perfil</span>
+                </a>
+                <a href="administracion.html" data-admin-only hidden>
+                    <i class="fa-solid fa-user-shield" aria-hidden="true"></i><span>Administración</span>
+                </a>
+                <a href="coordinador_vecinal.html" data-role-link="coordinator" hidden>
+                    <i class="fa-solid fa-tower-broadcast" aria-hidden="true"></i><span>Panel de coordinación</span>
+                </a>
+                <a href="personal_seguridad.html" data-role-link="security" hidden>
+                    <i class="fa-solid fa-shield-halved" aria-hidden="true"></i><span>Panel de seguridad</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-estado">
+                <div class="sidebar-estado-icono">
+                    <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
+                </div>
+                <div>
+                    <strong>Zona monitoreada</strong>
+                    <span>Seguridad disponible</span>
+                </div>
+            </div>
+
+            <button type="button" class="cerrar-sesion" id="btnCerrarSesionLateral">
+                <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
+                Cerrar sesión
+            </button>
+        </aside>
+
+        <section class="perfil-contenido">
+            <header class="perfil-superior">
+                <h1>Mi perfil</h1>
+                <p>Administra tu información personal y preferencias.</p>
+            </header>
+
+            <div class="perfil-grid">
+                <aside class="perfil-resumen-card" aria-label="Resumen del perfil">
+                    <div class="perfil-avatar-grande" id="perfilAvatarContainer">
+                        <i class="fa-solid fa-user" id="perfilAvatarIcon" aria-hidden="true"></i>
+                        <img id="perfilAvatarImg" alt="Foto de perfil" hidden>
+                        <input type="file" id="inputFoto" accept="image/*" hidden>
+                        <button class="btn-cambiar-foto" type="button" id="btnCambiarFoto"
+                            title="Cambiar foto" aria-label="Cambiar foto de perfil">
+                            <i class="fa-solid fa-camera" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                    <h2 id="resumenNombre">Cargando...</h2>
+                    <span class="perfil-rol" id="resumenRol">
+                        <i class="fa-solid fa-user-shield" aria-hidden="true"></i>
+                        Cargando...
+                    </span>
+                    <p id="estadoSolicitudRol" aria-live="polite">Usuario registrado en CoAlerta</p>
+
+                    <div class="perfil-resumen-info">
+                        <div>
+                            <i class="fa-solid fa-envelope" aria-hidden="true"></i>
+                            <span id="resumenCorreo">Cargando...</span>
+                        </div>
+                        <div>
+                            <i class="fa-solid fa-phone" aria-hidden="true"></i>
+                            <span id="resumenTelefono">Cargando...</span>
+                        </div>
+                        <div>
+                            <i class="fa-solid fa-location-dot" aria-hidden="true"></i>
+                            <span id="resumenZona">Cargando...</span>
+                        </div>
+                    </div>
+
+                    <div class="perfil-verificado" id="estadoCuenta">
+                        <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+                        Cuenta activa
+                    </div>
+                </aside>
+
+                <div class="perfil-paneles">
+                    <section class="perfil-card">
+                        <div class="perfil-card-header">
+                            <div>
+                                <h2>Información personal</h2>
+                                <p>Actualiza tus datos personales.</p>
+                            </div>
+                            <div class="perfil-card-icono">
+                                <i class="fa-solid fa-user" aria-hidden="true"></i>
+                            </div>
+                        </div>
+
+                        <form class="perfil-formulario" id="formPerfil">
+                            <div class="perfil-form-grid">
+                                <div class="grupo-formulario">
+                                    <label for="nombres">Nombres</label>
+                                    <div class="input-con-icono">
+                                        <i class="fa-solid fa-user" aria-hidden="true"></i>
+                                        <input type="text" id="nombres" autocomplete="given-name" required>
+                                    </div>
+                                </div>
+                                <div class="grupo-formulario">
+                                    <label for="apellidos">Apellidos</label>
+                                    <div class="input-con-icono">
+                                        <i class="fa-solid fa-user" aria-hidden="true"></i>
+                                        <input type="text" id="apellidos" autocomplete="family-name" required>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="grupo-formulario">
+                                <label for="correo">Correo electrónico</label>
+                                <div class="input-con-icono">
+                                    <i class="fa-solid fa-envelope" aria-hidden="true"></i>
+                                    <input type="email" id="correo" autocomplete="email" required>
+                                </div>
+                            </div>
+
+                            <div class="grupo-formulario">
+                                <label for="telefono">Número de celular</label>
+                                <div class="input-con-icono">
+                                    <i class="fa-solid fa-phone" aria-hidden="true"></i>
+                                    <input type="tel" id="telefono" inputmode="numeric" maxlength="9"
+                                        autocomplete="tel-national" required>
+                                </div>
+                            </div>
+
+                            <div class="grupo-formulario">
+                                <label for="rol">Tipo de usuario</label>
+                                <div class="input-con-icono select-con-icono">
+                                    <i class="fa-solid fa-users" aria-hidden="true"></i>
+                                    <select id="rol" disabled>
+                                        <option selected>Vecino</option>
+                                    </select>
+                                </div>
+                                <small class="campo-ayuda">El tipo de usuario no puede modificarse directamente.</small>
+                            </div>
+
+                            <div class="grupo-formulario">
+                                <label for="zona">Dirección de residencia</label>
+                                <div class="input-con-icono">
+                                    <i class="fa-solid fa-location-dot" aria-hidden="true"></i>
+                                    <input type="text" id="zona" autocomplete="address-level3" required>
+                                </div>
+                            </div>
+
+                            <div class="perfil-form-acciones">
+                                <button type="submit" class="btn-guardar-cambios">
+                                    <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>
+                                    Guardar cambios
+                                </button>
+                            </div>
+                            <div class="mensaje-perfil" id="mensajePerfil" aria-live="polite"></div>
+                        </form>
+                    </section>
+
+                    <section class="perfil-card">
+                        <div class="perfil-card-header">
+                            <div>
+                                <h2>Seguridad</h2>
+                                <p>Administra la contraseña de tu cuenta.</p>
+                            </div>
+                            <div class="perfil-card-icono">
+                                <i class="fa-solid fa-lock" aria-hidden="true"></i>
+                            </div>
+                        </div>
+
+                        <form class="perfil-formulario" id="formPassword">
+                            <div class="grupo-formulario">
+                                <label for="passwordActual">Contraseña actual</label>
+                                <div class="input-con-icono">
+                                    <i class="fa-solid fa-lock" aria-hidden="true"></i>
+                                    <input type="password" id="passwordActual" autocomplete="current-password"
+                                        placeholder="Ingresa tu contraseña actual" required>
+                                    <button type="button" class="ver-password" data-password="passwordActual"
+                                        aria-label="Mostrar contraseña actual" aria-pressed="false">
+                                        <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="grupo-formulario">
+                                <label for="passwordNueva">Nueva contraseña</label>
+                                <div class="input-con-icono">
+                                    <i class="fa-solid fa-key" aria-hidden="true"></i>
+                                    <input type="password" id="passwordNueva" autocomplete="new-password"
+                                        placeholder="Mínimo 8 caracteres" minlength="8" required>
+                                    <button type="button" class="ver-password" data-password="passwordNueva"
+                                        aria-label="Mostrar nueva contraseña" aria-pressed="false">
+                                        <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="grupo-formulario">
+                                <label for="passwordConfirmar">Confirmar nueva contraseña</label>
+                                <div class="input-con-icono">
+                                    <i class="fa-solid fa-key" aria-hidden="true"></i>
+                                    <input type="password" id="passwordConfirmar" autocomplete="new-password"
+                                        placeholder="Repite la nueva contraseña" minlength="8" required>
+                                    <button type="button" class="ver-password" data-password="passwordConfirmar"
+                                        aria-label="Mostrar confirmación de contraseña" aria-pressed="false">
+                                        <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="mensaje-perfil" id="mensajePassword" aria-live="polite"></div>
+                            <div class="perfil-form-acciones">
+                                <button type="submit" class="btn-cambiar-password">
+                                    <i class="fa-solid fa-key" aria-hidden="true"></i>
+                                    Cambiar contraseña
+                                </button>
+                            </div>
+                        </form>
+                    </section>
+
+                    <section class="perfil-card">
+                        <div class="perfil-card-header">
+                            <div>
+                                <h2>Contactos de emergencia</h2>
+                                <p>Guarda hasta dos contactos para tener sus datos disponibles durante una emergencia.</p>
+                            </div>
+                            <div class="perfil-card-icono">
+                                <i class="fa-solid fa-address-book" aria-hidden="true"></i>
+                            </div>
+                        </div>
+                        <form class="perfil-formulario" id="formContactos">
+                            <div class="perfil-form-grid">
+                                <div class="grupo-formulario">
+                                    <label for="contacto1Nombre">Nombre del contacto 1</label>
+                                    <div class="input-con-icono">
+                                        <i class="fa-solid fa-user" aria-hidden="true"></i>
+                                        <input type="text" id="contacto1Nombre" maxlength="80" autocomplete="off">
+                                    </div>
+                                </div>
+                                <div class="grupo-formulario">
+                                    <label for="contacto1Telefono">Celular del contacto 1</label>
+                                    <div class="input-con-icono">
+                                        <i class="fa-solid fa-phone" aria-hidden="true"></i>
+                                        <input type="tel" id="contacto1Telefono" inputmode="numeric" maxlength="9" placeholder="9 dígitos">
+                                    </div>
+                                </div>
+                                <div class="grupo-formulario">
+                                    <label for="contacto2Nombre">Nombre del contacto 2 (opcional)</label>
+                                    <div class="input-con-icono">
+                                        <i class="fa-solid fa-user" aria-hidden="true"></i>
+                                        <input type="text" id="contacto2Nombre" maxlength="80" autocomplete="off">
+                                    </div>
+                                </div>
+                                <div class="grupo-formulario">
+                                    <label for="contacto2Telefono">Celular del contacto 2 (opcional)</label>
+                                    <div class="input-con-icono">
+                                        <i class="fa-solid fa-phone" aria-hidden="true"></i>
+                                        <input type="tel" id="contacto2Telefono" inputmode="numeric" maxlength="9" placeholder="9 dígitos">
+                                    </div>
+                                </div>
+                            </div>
+                            <p class="campo-ayuda">Los contactos quedan guardados en Firebase. La mensajería directa a contactos requiere una integración de envío configurada.</p>
+                            <div class="mensaje-perfil" id="mensajeContactos" aria-live="polite"></div>
+                            <div class="perfil-form-acciones">
+                                <button type="submit" class="btn-guardar-cambios">
+                                    <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i> Guardar contactos
+                                </button>
+                            </div>
+                        </form>
+                    </section>
+
+                    <section class="perfil-card">
+                        <div class="perfil-card-header">
+                            <div>
+                                <h2>Desactivación por robo o extravío</h2>
+                                <p>Verifica tu identidad para marcar la cuenta como inactiva.</p>
+                            </div>
+                            <div class="perfil-card-icono">
+                                <i class="fa-solid fa-mobile-screen-button" aria-hidden="true"></i>
+                            </div>
+                        </div>
+                        <form class="perfil-formulario" id="formDesactivarCuenta">
+                            <p id="preguntaSeguridadActual" class="campo-ayuda">Confirma tu identidad ingresando el DNI asociado a esta cuenta.</p>
+                            <div class="perfil-form-grid">
+                                <div class="grupo-formulario">
+                                    <label for="dniDesactivacion">DNI del titular</label>
+                                    <div class="input-con-icono">
+                                        <i class="fa-solid fa-id-card" aria-hidden="true"></i>
+                                        <input type="text" id="dniDesactivacion" inputmode="numeric" maxlength="8" required>
+                                    </div>
+                                </div>
+                            </div>
+                            <p class="campo-ayuda">Esta acción desactiva la cuenta y cierra la sesión actual. Se requiere confirmar el DNI asociado para continuar.</p>
+                            <div class="mensaje-perfil" id="mensajeDesactivacion" aria-live="polite"></div>
+                            <div class="perfil-form-acciones">
+                                <button type="submit" class="btn-cambiar-password">
+                                    <i class="fa-solid fa-ban" aria-hidden="true"></i> Desactivar cuenta
+                                </button>
+                            </div>
+                        </form>
+                    </section>
+
+                    <section class="perfil-card">
+                        <div class="perfil-card-header">
+                            <div>
+                                <h2>Preferencias</h2>
+                                <p>Configura las notificaciones de CoAlerta.</p>
+                            </div>
+                            <div class="perfil-card-icono">
+                                <i class="fa-solid fa-sliders" aria-hidden="true"></i>
+                            </div>
+                        </div>
+
+                        <div class="preferencias-lista">
+                            <div class="preferencia-item">
+                                <div class="preferencia-info">
+                                    <div class="preferencia-icono"><i class="fa-solid fa-bell" aria-hidden="true"></i></div>
+                                    <div>
+                                        <strong id="preferenciaAlertasLabel">Notificaciones de alertas</strong>
+                                        <span id="preferenciaAlertasAyuda">Recibe avisos sobre incidentes cercanos.</span>
+                                    </div>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" id="preferenciaAlertas" checked
+                                        aria-labelledby="preferenciaAlertasLabel" aria-describedby="preferenciaAlertasAyuda">
+                                    <span class="slider" aria-hidden="true"></span>
+                                </label>
+                            </div>
+                            <div class="preferencia-item">
+                                <div class="preferencia-info">
+                                    <div class="preferencia-icono"><i class="fa-solid fa-volume-high" aria-hidden="true"></i></div>
+                                    <div>
+                                        <strong id="preferenciaSonidoLabel">Sonido de emergencia</strong>
+                                        <span id="preferenciaSonidoAyuda">Reproduce un tono cuando llegue una alerta activa nueva. El navegador puede requerir una interacción para habilitar el audio.</span>
+                                    </div>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" id="preferenciaSonido" checked
+                                        aria-labelledby="preferenciaSonidoLabel" aria-describedby="preferenciaSonidoAyuda">
+                                    <span class="slider" aria-hidden="true"></span>
+                                </label>
+                            </div>
+                            <div class="preferencia-item">
+                                <div class="preferencia-info">
+                                    <div class="preferencia-icono"><i class="fa-solid fa-location-crosshairs" aria-hidden="true"></i></div>
+                                    <div>
+                                        <strong id="preferenciaUbicacionLabel">Permitir ubicación</strong>
+                                        <span id="preferenciaUbicacionAyuda">Facilita el envío de tu ubicación en una emergencia.</span>
+                                    </div>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" id="preferenciaUbicacion" checked
+                                        aria-labelledby="preferenciaUbicacionLabel" aria-describedby="preferenciaUbicacionAyuda">
+                                    <span class="slider" aria-hidden="true"></span>
+                                </label>
+                            </div>
+                            <div class="preferencia-item">
+                                <div class="preferencia-info">
+                                    <div class="preferencia-icono"><i class="fa-solid fa-moon" aria-hidden="true"></i></div>
+                                    <div>
+                                        <strong id="preferenciaTemaOscuroLabel">Modo oscuro</strong>
+                                        <span id="preferenciaTemaOscuroAyuda">Usa una paleta oscura de alto contraste en toda la aplicación.</span>
+                                    </div>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" id="preferenciaTemaOscuro"
+                                        aria-labelledby="preferenciaTemaOscuroLabel" aria-describedby="preferenciaTemaOscuroAyuda">
+                                    <span class="slider" aria-hidden="true"></span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="perfil-form-acciones">
+                            <button type="button" class="btn-probar-sonido" id="probarSonidoEmergencia">
+                                <i class="fa-solid fa-volume-high" aria-hidden="true"></i>
+                                Probar sonido
+                            </button>
+                        </div>
+                        <p class="estado-sonido" id="estadoSonidoEmergencia" aria-live="polite"></p>
+                    </section>
+
+                    <section class="perfil-card">
+                        <div class="perfil-card-header">
+                            <div>
+                                <h2>Privacidad y cuenta</h2>
+                                <p>Administra las opciones relacionadas con tu cuenta.</p>
+                            </div>
+                            <div class="perfil-card-icono">
+                                <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
+                            </div>
+                        </div>
+                        <div class="perfil-opciones-cuenta">
+                            <a class="opcion-cuenta" href="../index.html#seguridad">
+                                <div>
+                                    <i class="fa-solid fa-file-shield" aria-hidden="true"></i>
+                                    <span>
+                                        <strong>Protección de datos</strong>
+                                        <small>Conoce el enfoque de privacidad de CoAlerta.</small>
+                                    </span>
+                                </div>
+                                <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                            </a>
+                            <button type="button" class="opcion-cuenta opcion-peligro" id="btnCerrarSesion">
+                                <div>
+                                    <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
+                                    <span>
+                                        <strong>Cerrar sesión</strong>
+                                        <small>Salir de tu cuenta en este dispositivo.</small>
+                                    </span>
+                                </div>
+                                <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <nav class="menu-inferior-mobile" aria-label="Navegación móvil">
+        <a href="mapa.html">
+            <i class="fa-solid fa-map-location-dot" aria-hidden="true"></i><span>Mapa</span>
+        </a>
+        <a href="historial.html">
+            <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i><span>Historial</span>
+        </a>
+        <a href="comunidad.html">
+            <i class="fa-solid fa-users" aria-hidden="true"></i><span>Comunidad</span>
+        </a>
+        <a href="perfil.html" class="activo" aria-current="page">
+            <i class="fa-solid fa-user" aria-hidden="true"></i><span>Perfil</span>
+        </a>
+        <a href="coordinador_vecinal.html" data-role-link="coordinator" hidden>
+            <i class="fa-solid fa-tower-broadcast" aria-hidden="true"></i><span>Coordinación</span>
+        </a>
+        <a href="personal_seguridad.html" data-role-link="security" hidden>
+            <i class="fa-solid fa-shield-halved" aria-hidden="true"></i><span>Seguridad</span>
+        </a>
+        <a href="administracion.html" data-admin-only hidden>
+            <i class="fa-solid fa-user-shield" aria-hidden="true"></i><span>Admin</span>
+        </a>
+    </nav>
+
+    <script type="module" src="../js/estado-cuenta.js?v=modular-sdk-1"></script>
+    <script type="module" src="../js/coalerta-data.js?v=notice-history-audit-20261030"></script>
+    <script src="../js/ubicacion.js"></script>
+    <script src="../js/notificaciones.js?v=20261029-notifications-read-v2"></script>
+    <script type="module" src="../js/perfil.js?v=community-member-contact-20261029"></script>
+</body>
+</html>
