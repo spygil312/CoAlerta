@@ -1,0 +1,389 @@
+/* =========================================================
+   COALERTA - REGISTRO.CSS
+========================================================= */
+
+.pagina-registro {
+    min-height: 100vh;
+    background: var(--fondo);
+}
+
+.registro-principal {
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.registro-info {
+    position: relative;
+    position: sticky;
+    top: 0;
+    align-self: start;
+    overflow: hidden;
+    height: 100vh;
+    background: linear-gradient(145deg, var(--verde-oscuro) 0%, var(--verde-principal) 100%);
+    color: var(--blanco);
+    padding: 60px 50px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.registro-info-contenido {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 420px;
+    margin: 0 auto;
+}
+
+.registro-logo .logo-icono {
+    background: rgba(255, 255, 255, 0.18);
+    color: var(--blanco);
+}
+
+.registro-logo .logo-co,
+.registro-logo .logo-alerta {
+    color: var(--blanco);
+}
+
+.registro-mensaje h1 span {
+    color: #B8F2D5;
+}
+
+.registro-logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 30px;
+}
+
+.registro-etiqueta {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--verde-claro);
+    color: var(--verde-principal);
+    padding: 8px 16px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 15px;
+}
+
+.registro-mensaje h1 {
+    font-size: 32px;
+    line-height: 1.15;
+    margin-bottom: 15px;
+}
+
+.registro-mensaje p {
+    font-size: 16px;
+    opacity: 0.9;
+    margin-bottom: 40px;
+}
+
+.registro-beneficios {
+    display: flex;
+    flex-direction: column;
+    gap: 25px;
+}
+
+.registro-beneficio {
+    display: flex;
+    align-items: flex-start;
+    gap: 15px;
+}
+
+.registro-beneficio-icono {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.registro-beneficio strong {
+    display: block;
+    font-size: 15px;
+    margin-bottom: 6px;
+}
+
+.registro-beneficio span {
+    color: rgba(255, 255, 255, 0.78);
+    font-size: 13px;
+}
+
+.registro-circulo {
+    position: absolute;
+    width: 260px;
+    height: 260px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 50%;
+    pointer-events: none;
+}
+
+.registro-circulo-1 {
+    right: -120px;
+    bottom: -100px;
+}
+
+.registro-circulo-2 {
+    right: -70px;
+    bottom: -50px;
+    width: 160px;
+    height: 160px;
+}
+
+.registro-formulario-seccion {
+    background: var(--blanco);
+    padding: 50px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.registro-formulario-contenedor {
+    width: 100%;
+    max-width: 420px;
+}
+
+.campo-ayuda {
+    display: block;
+    margin-top: 5px;
+    color: var(--texto-secundario);
+    font-size: 11px;
+    line-height: 1.45;
+}
+
+.campo-ayuda[hidden] {
+    display: none;
+}
+
+.volver-inicio {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--texto-secundario);
+    font-size: 14px;
+    margin-bottom: 30px;
+}
+
+.registro-formulario-header {
+    margin-bottom: 30px;
+}
+
+.registro-formulario-header .registro-icono-mobile {
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+    background: var(--verde-claro);
+    color: var(--verde-principal);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 18px;
+    font-size: 24px;
+}
+
+.registro-formulario-header h2 {
+    font-size: 26px;
+    margin-bottom: 8px;
+}
+
+.registro-formulario-header p {
+    color: var(--texto-secundario);
+    font-size: 15px;
+}
+
+.form-registro {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.grupo-formulario {
+    display: flex;
+    flex-direction: column;
+}
+
+.grupo-formulario label {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 7px;
+    color: var(--texto);
+}
+
+.input-con-icono {
+    position: relative;
+}
+
+.input-con-icono input,
+.input-con-icono select {
+    width: 100%;
+    padding: 14px 15px 14px 45px;
+    border: 1px solid var(--borde);
+    border-radius: 12px;
+    font-size: 15px;
+    background: var(--blanco);
+}
+
+.input-con-icono i {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--texto-secundario);
+}
+
+.ver-password {
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--texto-secundario);
+    cursor: pointer;
+}
+
+.registro-terminos {
+    margin-top: 15px;
+    font-size: 13px;
+}
+
+.checkbox-terminos {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    color: var(--texto-secundario);
+}
+
+.registro-terminos a {
+    color: var(--verde-principal);
+    text-decoration: underline;
+}
+
+.mensaje-registro {
+    margin-top: 15px;
+    padding: 12px 15px;
+    border-radius: 10px;
+    font-size: 14px;
+    min-height: 24px;
+    line-height: 1.4;
+}
+
+.mensaje-registro.error {
+    background: var(--rojo-claro);
+    color: var(--rojo);
+}
+
+.mensaje-registro.correcto {
+    background: var(--verde-claro);
+    color: var(--verde-principal);
+}
+
+.btn-crear-cuenta {
+    width: 100%;
+    padding: 14px;
+    background: var(--verde-principal);
+    color: var(--blanco);
+    border: none;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 16px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.btn-crear-cuenta:hover {
+    background: var(--verde-oscuro);
+}
+
+.login-separador {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    color: var(--texto-secundario);
+    font-size: 13px;
+    margin-top: 25px;
+}
+
+.login-separador::before,
+.login-separador::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--borde);
+}
+
+.btn-google {
+    width: 100%;
+    padding: 13px;
+    border: 1px solid var(--borde);
+    border-radius: 10px;
+    background: var(--blanco);
+    color: var(--texto);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    transition: 0.2s;
+}
+
+.btn-google:hover {
+    background: var(--fondo);
+}
+
+.registro-login {
+    text-align: center;
+    margin-top: 25px;
+    font-size: 14px;
+}
+
+.registro-login a {
+    color: var(--verde-principal);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.login-aviso {
+    margin-top: 25px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--texto-secundario);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+@media (max-width: 900px) {
+    .registro-principal {
+        grid-template-columns: 1fr;
+    }
+
+    .registro-info {
+        display: none;
+    }
+
+    .registro-formulario-seccion {
+        min-height: 100vh;
+    }
+}
+
+@media (max-width: 480px) {
+    .registro-formulario-seccion {
+        padding: 24px 18px;
+    }
+
+    .volver-inicio,
+    .registro-formulario-header {
+        margin-bottom: 24px;
+    }
+}
