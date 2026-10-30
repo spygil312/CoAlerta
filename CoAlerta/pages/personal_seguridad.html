@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#123c35">
+    <title>Operaciones de seguridad | CoAlerta</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="stylesheet" href="../css/estilos.css">
+    <link rel="stylesheet" href="../css/responsive.css">
+    <link rel="stylesheet" href="../css/mapa.css?v=ordered-panels-gps-dispatch-20261029">
+    <link rel="stylesheet" href="../css/personal-seguridad.css?v=ordered-panels-gps-dispatch-20261029">
+    <script src="../js/tema.js?v=dark-theme-nav-order-20261029"></script>
+</head>
+<body class="pagina-seguridad" data-role-navigation-ready="false">
+    <header class="mapa-header">
+        <div class="mapa-header-contenido">
+            <a href="../index.html" class="logo" aria-label="Co Alerta, inicio">
+                <span class="logo-icono"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i></span>
+                <span class="logo-texto"><span class="logo-co">Co</span><span class="logo-alerta">Alerta</span></span>
+            </a>
+            <div class="mapa-header-centro">
+                <div class="estado-sistema">
+                    <span class="estado-punto" aria-hidden="true"></span>
+                    Operaciones de seguridad
+                </div>
+            </div>
+            <div class="mapa-header-derecha">
+                <button class="boton-header" type="button" id="btnNotificaciones" title="Notificaciones" aria-label="Notificaciones" aria-expanded="false" aria-controls="menuNotificaciones">
+                    <i class="fa-solid fa-bell" aria-hidden="true"></i><span class="notificacion-contador" hidden></span>
+                </button>
+                <div id="menuNotificaciones" class="menu-notificaciones" hidden>
+                    <h4>Notificaciones</h4>
+                    <div class="notificacion-contenido" id="notificacionesLista" aria-live="polite">
+                        Abre las notificaciones para consultar alertas y comunicados.
+                    </div>
+                </div>
+                <a class="boton-header" title="Perfil" aria-label="Mi perfil" href="perfil.html">
+                    <i class="fa-solid fa-user" aria-hidden="true"></i>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main class="mapa-layout">
+        <aside class="mapa-sidebar" aria-label="Navegación principal">
+            <div class="sidebar-usuario">
+                <div class="usuario-avatar" id="sidebarAvatarContainer">
+                    <i class="fa-solid fa-user" id="sidebarAvatarIcon" aria-hidden="true"></i>
+                    <img id="sidebarAvatarImg" alt="Foto de perfil" hidden>
+                </div>
+                <div class="sidebar-usuario-datos">
+                    <strong id="sidebarNombre">Personal de seguridad</strong>
+                    <span id="sidebarRol">Personal de seguridad</span>
+                </div>
+            </div>
+
+            <nav class="sidebar-menu">
+                <a href="mapa.html">
+                    <i class="fa-solid fa-map-location-dot" aria-hidden="true"></i><span>Mapa</span>
+                </a>
+                <a href="historial.html">
+                    <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i><span>Historial</span>
+                </a>
+                <a href="comunidad.html">
+                    <i class="fa-solid fa-users" aria-hidden="true"></i><span>Mi comunidad</span>
+                </a>
+                <a href="perfil.html">
+                    <i class="fa-solid fa-user-gear" aria-hidden="true"></i><span>Mi perfil</span>
+                </a>
+                <a href="administracion.html" data-admin-only hidden>
+                    <i class="fa-solid fa-user-shield" aria-hidden="true"></i><span>Administración</span>
+                </a>
+                <a href="coordinador_vecinal.html" data-role-link="coordinator" hidden>
+                    <i class="fa-solid fa-tower-broadcast" aria-hidden="true"></i><span>Panel de coordinación</span>
+                </a>
+                <a href="personal_seguridad.html" class="activo" aria-current="page" data-role-link="security">
+                    <i class="fa-solid fa-shield-halved" aria-hidden="true"></i><span>Panel de seguridad</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-estado">
+                <div class="sidebar-estado-icono">
+                    <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
+                </div>
+                <div>
+                    <strong>Centro de respuesta</strong>
+                    <span>Gestión de alertas asignadas</span>
+                </div>
+            </div>
+
+            <button type="button" class="cerrar-sesion" id="btnCerrarSesionSeguridad">
+                <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
+                Cerrar sesión
+            </button>
+        </aside>
+
+        <section class="mapa-contenido seguridad-main">
+            <section class="seguridad-heading">
+                <div>
+                    <p class="seguridad-eyebrow">CENTRO DE RESPUESTA</p>
+                    <h1>Panel de personal de seguridad</h1>
+                    <p>Revisa alertas derivadas, comparte la ubicación de tu unidad y registra el resultado de la atención.</p>
+                </div>
+                <span id="estadoSeguridad" class="seguridad-status" role="status">Conectando con Firebase…</span>
+            </section>
+
+            <section class="seguridad-metrics" aria-label="Resumen operativo">
+                <article><span>Alertas por atender</span><strong id="metricPendientes">0</strong></article>
+                <article><span>En camino o en sitio</span><strong id="metricActivas">0</strong></article>
+                <article><span>Unidad asignada</span><strong id="metricUnidad">Sin asignar</strong></article>
+            </section>
+
+            <section class="seguridad-grid">
+                <section class="seguridad-panel">
+                    <div class="seguridad-panel-heading">
+                        <div>
+                            <h2>Cola de atención</h2>
+                            <p>Selecciona una alerta para consultar sus detalles y ubicación.</p>
+                        </div>
+                        <button class="seguridad-button seguridad-button-light" id="btnActualizarSeguridad" type="button">
+                            <i class="fa-solid fa-rotate" aria-hidden="true"></i> Actualizar
+                        </button>
+                    </div>
+                    <p id="avisoUnidad" class="seguridad-notice" hidden></p>
+                    <p id="avisoDespacho" class="seguridad-notice seguridad-dispatch-notice" role="status" aria-live="polite">
+                        Requiere unidad asignada y GPS activo actualizado en los últimos 5 minutos.
+                    </p>
+                    <div id="listaAlertasSeguridad" class="seguridad-alert-list" aria-live="polite">
+                        <p class="seguridad-empty">Cargando incidentes…</p>
+                    </div>
+                </section>
+
+                <section class="seguridad-panel seguridad-map-panel">
+                    <div class="seguridad-panel-heading">
+                        <div>
+                            <h2>Detalle y ubicación</h2>
+                            <p id="detalleSeleccionado">Selecciona una alerta de la cola.</p>
+                        </div>
+                    </div>
+                    <div id="mapaSeguridad" aria-label="Mapa de alertas y ruta de respuesta"></div>
+                    <div class="seguridad-map-actions">
+                        <button class="seguridad-button" id="btnUbicacionUnidad" type="button">
+                            <i class="fa-solid fa-location-crosshairs" aria-hidden="true"></i> Compartir ubicación de unidad
+                        </button>
+                        <button class="seguridad-button seguridad-button-light" id="btnDetenerUbicacion" type="button" disabled>
+                            Detener ubicación
+                        </button>
+                    </div>
+                    <p id="estadoUbicacionSeguridad" class="seguridad-hint" role="status">La ubicación no se está compartiendo.</p>
+                    <p id="estadoRutaSeguridad" class="seguridad-hint" role="status"></p>
+                </section>
+            </section>
+        </section>
+    </main>
+
+    <nav class="menu-inferior-mobile" aria-label="Navegación móvil">
+        <a href="personal_seguridad.html" class="activo" aria-current="page" data-role-link="security">
+            <i class="fa-solid fa-shield-halved" aria-hidden="true"></i><span>Seguridad</span>
+        </a>
+        <a href="mapa.html">
+            <i class="fa-solid fa-map-location-dot" aria-hidden="true"></i><span>Mapa</span>
+        </a>
+        <a href="historial.html">
+            <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i><span>Historial</span>
+        </a>
+        <a href="comunidad.html">
+            <i class="fa-solid fa-users" aria-hidden="true"></i><span>Comunidad</span>
+        </a>
+        <a href="perfil.html">
+            <i class="fa-solid fa-user" aria-hidden="true"></i><span>Perfil</span>
+        </a>
+        <a href="coordinador_vecinal.html" data-role-link="coordinator" hidden>
+            <i class="fa-solid fa-tower-broadcast" aria-hidden="true"></i><span>Coordinación</span>
+        </a>
+        <a href="administracion.html" data-admin-only hidden>
+            <i class="fa-solid fa-user-shield" aria-hidden="true"></i><span>Admin</span>
+        </a>
+    </nav>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script type="module" src="../js/estado-cuenta.js?v=modular-sdk-1"></script>
+    <script type="module" src="../js/coalerta-data.js?v=notice-history-audit-20261030"></script>
+    <script src="../js/notificaciones.js?v=20261029-notifications-read-v2"></script>
+    <script type="module" src="../js/personal-seguridad.js?v=refresh-profile-gps-write-20261029"></script>
+</body>
+</html>

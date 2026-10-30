@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Historial de alertas | CoAlerta</title>
+
+    <!-- Fuente -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Iconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="../css/estilos.css?v=20261028-profile-ui-2">
+    <link rel="stylesheet" href="../css/responsive.css">
+    <link rel="stylesheet" href="../css/historial.css?v=ordered-panels-gps-dispatch-20261029">
+    <script src="../js/tema.js?v=20261029-theme-scroll"></script>
+</head>
+
+<body class="pagina-historial" data-role-navigation-ready="false">
+
+    <!-- ===================================
+         HEADER
+    ==================================== -->
+    <header class="mapa-header">
+        <div class="mapa-header-contenido">
+            <!-- LOGO -->
+            <a href="../index.html" class="logo" aria-label="Co Alerta, inicio">
+                <div class="logo-icono">
+                    <i class="fa-solid fa-shield-halved"></i>
+                </div>
+                <div class="logo-texto">
+                    <span class="logo-co">Co</span><span class="logo-alerta">Alerta</span>
+                </div>
+            </a>
+
+            <!-- CENTRO -->
+            <div class="mapa-header-centro">
+                <div class="estado-sistema">
+                    <span class="estado-punto"></span>
+                    <span id="estadoSistemaHistorial">Sin sesión</span>
+                </div>
+            </div>
+
+            <!-- DERECHA -->
+            <div class="mapa-header-derecha">
+                <button class="boton-header" type="button" title="Notificaciones" id="btnNotificaciones" aria-label="Notificaciones" aria-expanded="false" aria-controls="menuNotificaciones">
+                    <i class="fa-solid fa-bell"></i>
+                    <span class="notificacion-contador" hidden></span>
+                </button>
+
+                <!-- Menú oculto de notificaciones -->
+                <div id="menuNotificaciones" class="menu-notificaciones" hidden>
+                    <h4>Notificaciones</h4>
+                    <div class="notificacion-contenido" id="notificacionesLista" aria-live="polite">
+                        Solicitando permiso para detectar alertas cercanas...
+                    </div>
+                </div>
+
+                <a class="boton-header" title="Perfil" aria-label="Mi perfil" href="perfil.html">
+                    <i class="fa-solid fa-user"></i>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- ===================================
+         CONTENEDOR PRINCIPAL
+    ==================================== -->
+    <main class="mapa-layout">
+
+        <!-- ===================================
+             SIDEBAR
+        ==================================== -->
+        <aside class="mapa-sidebar">
+
+            <!-- USUARIO -->
+            <div class="sidebar-usuario">
+                <div class="usuario-avatar" id="sidebarAvatarContainer">
+                    <i class="fa-solid fa-user" id="sidebarAvatarIcon"></i>
+                    <img id="sidebarAvatarImg" alt="Foto de perfil" hidden>
+                </div>
+                <div>
+                    <strong id="sidebarNombre">Hola, usuario</strong>
+                    <span id="sidebarRol">Vecino</span>
+                </div>
+            </div>
+
+            <!-- MENÚ -->
+            <nav class="sidebar-menu">
+                <a href="mapa.html">
+                    <i class="fa-solid fa-map-location-dot"></i>
+                    <span>Mapa</span>
+                </a>
+                <a href="historial.html" class="activo">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                    <span>Historial</span>
+                </a>
+                <a href="comunidad.html">
+                    <i class="fa-solid fa-users"></i>
+                    <span>Mi comunidad</span>
+                </a>
+                <a href="perfil.html">
+                    <i class="fa-solid fa-user-gear"></i>
+                    <span>Mi perfil</span>
+                </a>
+                <a href="administracion.html" data-admin-only hidden>
+                    <i class="fa-solid fa-user-shield" aria-hidden="true"></i>
+                    <span>Administración</span>
+                </a>
+                <a href="coordinador_vecinal.html" data-role-link="coordinator" hidden>
+                    <i class="fa-solid fa-tower-broadcast" aria-hidden="true"></i>
+                    <span>Panel de coordinación</span>
+                </a>
+                <a href="personal_seguridad.html" data-role-link="security" hidden>
+                    <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
+                    <span>Panel de seguridad</span>
+                </a>
+            </nav>
+
+            <!-- ESTADO -->
+            <div class="sidebar-estado">
+                <div class="sidebar-estado-icono">
+                    <i class="fa-solid fa-shield-halved"></i>
+                </div>
+                <div>
+                    <strong id="estadoOperacionHistorial">Conexión requerida</strong>
+                    <span id="detalleOperacionHistorial">Inicia sesión para consultar tus reportes.</span>
+                </div>
+            </div>
+
+            <!-- CERRAR SESIÓN -->
+            <a href="login.html" class="cerrar-sesion" id="btnCerrarSesionLateral">
+                <i class="fa-solid fa-right-from-bracket"></i>
+                Cerrar sesión
+            </a>
+        </aside>
+
+        <!-- ===================================
+             CONTENIDO
+        ==================================== -->
+        <section class="historial-contenido">
+
+            <!-- CABECERA -->
+            <div class="historial-superior">
+                <div>
+                    <h1>Historial<span class="historial-titulo-resto"> de alertas</span></h1>
+                    <p>Consulta y revisa tus reportes de emergencia.</p>
+                </div>
+                <button class="btn-exportar" id="btnExportar" type="button" aria-label="Exportar historial" title="Exportar historial">
+                    <i class="fa-solid fa-file-arrow-down"></i>
+                    Exportar
+                </button>
+            </div>
+
+            <!-- ===================================
+                 ESTADÍSTICAS
+            ==================================== -->
+            <div class="historial-estadisticas">
+                <div class="estadistica-card">
+                    <div class="estadistica-icono azul">
+                        <i class="fa-solid fa-list-check"></i>
+                    </div>
+                    <div>
+                        <span>Total de alertas</span>
+                        <strong id="totalAlertas">0</strong>
+                    </div>
+                </div>
+
+                <div class="estadistica-card">
+                    <div class="estadistica-icono verde">
+                        <i class="fa-solid fa-circle-check"></i>
+                    </div>
+                    <div>
+                        <span>Atendidas</span>
+                        <strong id="totalAtendidas">0</strong>
+                    </div>
+                </div>
+
+                <div class="estadistica-card">
+                    <div class="estadistica-icono amarillo">
+                        <i class="fa-solid fa-clock"></i>
+                    </div>
+                    <div>
+                        <span>En proceso</span>
+                        <strong id="totalProceso">0</strong>
+                    </div>
+                </div>
+
+                <div class="estadistica-card">
+                    <div class="estadistica-icono rojo">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                    </div>
+                    <div>
+                        <span>Críticas</span>
+                        <strong id="totalCriticas">0</strong>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===================================
+                 FILTROS
+            ==================================== -->
+            <section class="historial-filtros">
+                <div class="filtro-grupo">
+                    <label for="buscarAlerta">Buscar</label>
+                    <div class="input-busqueda">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input type="text" id="buscarAlerta" placeholder="Buscar por tipo, ubicación o clave..." aria-label="Buscar alertas por tipo, ubicación o clave">
+                    </div>
+                </div>
+
+                <div class="filtro-grupo">
+                    <label for="filtroTipo">Tipo</label>
+                    <div class="input-busqueda">
+                        <i class="fa-solid fa-filter" aria-hidden="true"></i>
+                        <select id="filtroTipo">
+                            <option value="todos">Todos los tipos</option>
+                            <option value="robo">Robo</option>
+                            <option value="sospechoso">Sospechoso</option>
+                            <option value="accidente">Accidente</option>
+                            <option value="incendio">Incendio</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="filtro-grupo">
+                    <label for="filtroEstado">Estado</label>
+                    <div class="input-busqueda">
+                        <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+                        <select id="filtroEstado">
+                            <option value="todos">Todos los estados</option>
+                            <option value="atendida">Atendida</option>
+                            <option value="proceso">En proceso</option>
+                            <option value="cerrada">Cerrada</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="filtro-grupo">
+                    <label for="filtroFecha">Fecha</label>
+                    <div class="input-busqueda">
+                        <i class="fa-regular fa-calendar" aria-hidden="true"></i>
+                        <input type="date" id="filtroFecha">
+                    </div>
+                </div>
+
+                <button class="btn-limpiar-filtros" id="btnLimpiarFiltros">
+                    <i class="fa-solid fa-filter-circle-xmark"></i>
+                    Limpiar
+                </button>
+            </section>
+
+            <!-- ===================================
+                 TABLA / LISTADO
+            ==================================== -->
+            <div class="historial-registro-layout">
+                <section class="historial-card">
+                    <div class="historial-card-header">
+                        <div>
+                            <h2>Registro de alertas</h2>
+                            <span id="cantidadResultados">0 resultados</span>
+                        </div>
+                    </div>
+
+                    <div class="tabla-responsive">
+                        <table class="tabla-historial">
+                            <thead>
+                                <tr>
+                                    <th>Tipo</th>
+                                    <th>Ubicación</th>
+                                    <th>Fecha</th>
+                                    <th>Hora</th>
+                                    <th>Estado</th>
+                                    <th>Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tablaHistorial">
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- SIN RESULTADOS -->
+                    <div class="sin-resultados" id="sinResultados">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <h3>No encontramos alertas</h3>
+                        <p>Prueba reportando una emergencia en el mapa o cambiando los filtros de búsqueda.</p>
+                    </div>
+                </section>
+                <section class="modal-fondo historial-detalle-panel" id="modalDetalle" aria-label="Detalle de alerta">
+                    <div class="modal-detalle-alerta">
+                        <button class="modal-cerrar" id="cerrarDetalle" aria-label="Cerrar detalle">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+
+                        <div class="detalle-alerta-header">
+                            <div class="detalle-alerta-icono">
+                                <i class="fa-solid fa-triangle-exclamation"></i>
+                            </div>
+                            <div>
+                                <span>Detalle de alerta</span>
+                                <h2 id="detalleTitulo">Selecciona una alerta</h2>
+                            </div>
+                        </div>
+
+                        <div class="detalle-alerta-contenido">
+                            <div class="detalle-fila detalle-fila-ubicacion">
+                                <span><i class="fa-solid fa-location-dot" aria-hidden="true"></i> Ubicación</span>
+                                <strong id="detalleUbicacion">—</strong>
+                            </div>
+                            <div class="detalle-fila">
+                                <span><i class="fa-solid fa-calendar"></i> Fecha</span>
+                                <strong id="detalleFecha">—</strong>
+                            </div>
+                            <div class="detalle-fila">
+                                <span><i class="fa-solid fa-clock"></i> Hora</span>
+                                <strong id="detalleHora">—</strong>
+                            </div>
+                            <div class="detalle-fila">
+                                <span><i class="fa-solid fa-shield-halved"></i> Estado</span>
+                                <strong id="detalleEstado">—</strong>
+                            </div>
+                            <div class="detalle-fila detalle-reporte">
+                                <span><i class="fa-solid fa-align-left"></i> Detalle del reporte</span>
+                                <p id="detalleReporteTexto">Elige un reporte para consultar sus detalles.</p>
+                            </div>
+                            <div class="detalle-mensaje" id="detalleMensaje">
+                                <i class="fa-solid fa-circle-check" id="detalleMensajeIcono"></i>
+                                <div>
+                                    <strong id="detalleMensajeTitulo">Detalle de alerta</strong>
+                                    <p id="detalleMensajeTexto">La información de la alerta aparecerá aquí.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="detalle-acciones">
+                            <a href="mapa.html" class="btn-ver-ubicacion">
+                                <i class="fa-solid fa-map-location-dot"></i>
+                                Ver en mapa
+                            </a>
+                            <button class="btn-cerrar-detalle" id="btnCerrarDetalle">Cerrar</button>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </section>
+    </main>
+
+    <!-- ===================================
+         MENÚ MOBILE
+    ==================================== -->
+    <nav class="menu-inferior-mobile" aria-label="Navegación móvil">
+        <a href="mapa.html">
+            <i class="fa-solid fa-map-location-dot" aria-hidden="true"></i>
+            <span>Mapa</span>
+        </a>
+        <a href="historial.html" class="activo" aria-current="page">
+            <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i>
+            <span>Historial</span>
+        </a>
+        <a href="comunidad.html">
+            <i class="fa-solid fa-users" aria-hidden="true"></i>
+            <span>Comunidad</span>
+        </a>
+        <a href="perfil.html">
+            <i class="fa-solid fa-user" aria-hidden="true"></i>
+            <span>Perfil</span>
+        </a>
+        <a href="coordinador_vecinal.html" data-role-link="coordinator" hidden>
+            <i class="fa-solid fa-tower-broadcast" aria-hidden="true"></i><span>Coordinación</span>
+        </a>
+        <a href="personal_seguridad.html" data-role-link="security" hidden>
+            <i class="fa-solid fa-shield-halved" aria-hidden="true"></i><span>Seguridad</span>
+        </a>
+        <a href="administracion.html" data-admin-only hidden>
+            <i class="fa-solid fa-user-shield" aria-hidden="true"></i><span>Admin</span>
+        </a>
+    </nav>
+
+    <!-- Firebase modular -->
+    <script type="module" src="../js/estado-cuenta.js?v=modular-sdk-1"></script>
+    <script src="../js/ubicacion.js"></script>
+    <script src="../js/notificaciones.js?v=20261029-notifications-read-v2"></script>
+    <script type="module" src="../js/coalerta-data.js?v=history-status-sync-20261030"></script>
+    <script type="module" src="../js/historial.js?v=history-status-sync-20261030"></script>
+</body>
+</html>
