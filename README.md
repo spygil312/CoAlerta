@@ -50,9 +50,9 @@ Al ser un proyecto desarrollado con tecnologías web estándar (sin frameworks c
    ```bash
    git clone [https://github.com/spygil312/CoAlerta.git](https://github.com/spygil312/CoAlerta.git)
 
-1. Abrir el proyecto: Abre la carpeta del proyecto en tu editor de código preferido (ej. Visual Studio Code).
-2. Configurar Firebase: Asegúrate de que el archivo firebase-config.js contenga las credenciales de tu proyecto de Firebase.
-3. Ejecutar servidor local: Usa la extensión Live Server en VS Code (o cualquier servidor HTTP local) para abrir el archivo index.html.(Nota: Para que el inicio de sesión con Google funcione localmente, asegúrate de que el puerto y localhost estén en los dominios autorizados de tu consola de Firebase).
+1. **Abrir el proyecto:** Abre la carpeta del proyecto en tu editor de código preferido (ej. Visual Studio Code).
+2. **Configurar Firebase:** Asegúrate de que el archivo firebase-config.js contenga las credenciales de tu proyecto de Firebase.
+3. **Ejecutar servidor local:** Usa la extensión Live Server en VS Code (o cualquier servidor HTTP local) para abrir el archivo index.html.(Nota: Para que el inicio de sesión con Google funcione localmente, asegúrate de que el puerto y localhost estén en los dominios autorizados de tu consola de Firebase).
 
 ---
 
