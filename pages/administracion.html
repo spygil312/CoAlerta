@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#168A5B">
+    <title>Administración | CoAlerta</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="../css/estilos.css?v=20261028-profile-ui-2">
+    <link rel="stylesheet" href="../css/responsive.css">
+    <link rel="stylesheet" href="../css/mapa.css?v=ordered-panels-gps-dispatch-20261029">
+    <link rel="stylesheet" href="../css/administracion.css?v=unit-assignment-20261029">
+    <script src="../js/tema.js?v=20261029-theme-scroll"></script>
+</head>
+<body class="pagina-administracion" data-role-navigation-ready="false">
+    <header class="mapa-header">
+        <div class="mapa-header-contenido">
+            <a href="../index.html" class="logo" aria-label="Co Alerta, inicio">
+                <span class="logo-icono"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i></span>
+                <span class="logo-texto"><span class="logo-co">Co</span><span class="logo-alerta">Alerta</span></span>
+            </a>
+            <div class="mapa-header-centro">
+                <div class="estado-sistema"><span class="estado-punto" aria-hidden="true"></span>Administración</div>
+            </div>
+            <div class="mapa-header-derecha">
+                <button class="boton-header" type="button" id="btnNotificaciones" title="Notificaciones" aria-label="Notificaciones" aria-expanded="false" aria-controls="menuNotificaciones">
+                    <i class="fa-solid fa-bell" aria-hidden="true"></i><span class="notificacion-contador" hidden></span>
+                </button>
+                <div id="menuNotificaciones" class="menu-notificaciones" hidden>
+                    <h4>Notificaciones</h4>
+                    <div class="notificacion-contenido" id="notificacionesLista" aria-live="polite">
+                        Abre las notificaciones para consultar alertas y comunicados.
+                    </div>
+                </div>
+                <a class="boton-header" title="Perfil" aria-label="Mi perfil" href="perfil.html">
+                    <i class="fa-solid fa-user" aria-hidden="true"></i>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main class="mapa-layout">
+        <aside class="mapa-sidebar" aria-label="Navegación principal">
+            <div class="sidebar-usuario">
+                <div class="usuario-avatar"><i class="fa-solid fa-user-shield" aria-hidden="true"></i></div>
+                <div><strong>Administración</strong><span>Gestión de solicitudes</span></div>
+            </div>
+            <nav class="sidebar-menu">
+                <a href="mapa.html"><i class="fa-solid fa-map-location-dot" aria-hidden="true"></i><span>Mapa</span></a>
+                <a href="historial.html"><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i><span>Historial</span></a>
+                <a href="comunidad.html"><i class="fa-solid fa-users" aria-hidden="true"></i><span>Mi comunidad</span></a>
+                <a href="perfil.html"><i class="fa-solid fa-user-gear" aria-hidden="true"></i><span>Mi perfil</span></a>
+                <a href="administracion.html" class="activo" aria-current="page" data-admin-only hidden>
+                    <i class="fa-solid fa-user-shield" aria-hidden="true"></i><span>Administración</span>
+                </a>
+                <a href="coordinador_vecinal.html" data-role-link="coordinator" hidden>
+                    <i class="fa-solid fa-tower-broadcast" aria-hidden="true"></i><span>Panel de coordinación</span>
+                </a>
+                <a href="personal_seguridad.html" data-role-link="security" hidden>
+                    <i class="fa-solid fa-shield-halved" aria-hidden="true"></i><span>Panel de seguridad</span>
+                </a>
+            </nav>
+            <div class="sidebar-estado">
+                <div class="sidebar-estado-icono"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i></div>
+                <div><strong>Acceso restringido</strong><span>Solo cuenta autorizada</span></div>
+            </div>
+        </aside>
+
+        <section class="mapa-contenido administracion-contenido">
+            <header class="administracion-cabecera">
+                <div>
+                    <p class="administracion-eyebrow">GESTIÓN DE CUENTAS</p>
+                    <h1>Solicitudes de rol</h1>
+                    <p>Revisa las solicitudes para coordinador vecinal o personal de seguridad.</p>
+                </div>
+                <button class="administracion-actualizar" id="actualizarSolicitudes" type="button" disabled>
+                    <i class="fa-solid fa-rotate" aria-hidden="true"></i> Actualizar
+                </button>
+            </header>
+
+            <section id="avisoAdministracion" class="administracion-aviso" role="status" aria-live="polite">
+                Verificando autorización…
+            </section>
+            <section id="panelSolicitudes" class="administracion-panel" aria-label="Solicitudes pendientes" hidden>
+                <div class="administracion-panel-cabecera">
+                    <div><h2>Pendientes de revisión</h2><p id="cantidadSolicitudes">0 solicitudes</p></div>
+                    <i class="fa-solid fa-user-clock" aria-hidden="true"></i>
+                </div>
+                <div id="listaSolicitudes" class="administracion-lista"></div>
+            </section>
+
+            <section id="panelAsignacionUnidades" class="administracion-panel administracion-unidades-panel" aria-label="Asignación de unidades" hidden>
+                <div class="administracion-panel-cabecera">
+                    <div>
+                        <h2>Asignación de unidades</h2>
+                        <p>Asigna unidades disponibles a personal de seguridad aprobado.</p>
+                    </div>
+                    <button class="administracion-actualizar" id="inicializarUnidades" type="button" disabled>
+                        <i class="fa-solid fa-truck-fast" aria-hidden="true"></i> Preparar 10 unidades
+                    </button>
+                </div>
+                <p id="estadoUnidades" class="administracion-unidades-estado" role="status" aria-live="polite">
+                    Verificando unidades…
+                </p>
+                <div id="listaAsignacionUnidades" class="administracion-lista"></div>
+            </section>
+        </section>
+    </main>
+
+    <nav class="menu-inferior-mobile" aria-label="Navegación móvil">
+        <a href="administracion.html" class="activo" aria-current="page" data-admin-only hidden>
+            <i class="fa-solid fa-user-shield" aria-hidden="true"></i><span>Admin</span>
+        </a>
+        <a href="mapa.html">
+            <i class="fa-solid fa-map-location-dot" aria-hidden="true"></i><span>Mapa</span>
+        </a>
+        <a href="historial.html">
+            <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i><span>Historial</span>
+        </a>
+        <a href="comunidad.html">
+            <i class="fa-solid fa-users" aria-hidden="true"></i><span>Comunidad</span>
+        </a>
+        <a href="perfil.html">
+            <i class="fa-solid fa-user" aria-hidden="true"></i><span>Perfil</span>
+        </a>
+        <a href="coordinador_vecinal.html" data-role-link="coordinator" hidden>
+            <i class="fa-solid fa-tower-broadcast" aria-hidden="true"></i><span>Coordinación</span>
+        </a>
+        <a href="personal_seguridad.html" data-role-link="security" hidden>
+            <i class="fa-solid fa-shield-halved" aria-hidden="true"></i><span>Seguridad</span>
+        </a>
+    </nav>
+
+    <script type="module" src="../js/estado-cuenta.js?v=modular-sdk-1"></script>
+    <script src="../js/notificaciones.js?v=20261029-notifications-read-v2"></script>
+    <script type="module" src="../js/coalerta-data.js?v=hide-firebase-details-20261101"></script>
+    <script type="module" src="../js/administracion.js?v=admin-all-panels-20261029"></script>
+</body>
+</html>

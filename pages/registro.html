@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crear cuenta | CoAlerta</title>
+
+    <!-- Fuente -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+          rel="stylesheet">
+
+    <!-- Iconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="../css/estilos.css?v=20261028-profile-ui-2">
+    <link rel="stylesheet" href="../css/responsive.css">
+    <link rel="stylesheet" href="../css/registro.css?v=20261029-registration">
+</head>
+
+<body class="pagina-registro">
+    <main class="registro-principal">
+
+        <!-- ===================================
+             LADO IZQUIERDO
+        ==================================== -->
+        <section class="registro-info">
+            <div class="registro-info-contenido">
+
+                <!-- LOGO -->
+                <a href="../index.html" class="registro-logo" aria-label="Co Alerta, inicio">
+                    <div class="logo-icono">
+                        <i class="fa-solid fa-shield-halved"></i>
+                    </div>
+
+                    <div class="logo-texto">
+                        <span class="logo-co">Co</span>
+                        <span class="logo-alerta">Alerta</span>
+                    </div>
+                </a>
+
+                <!-- MENSAJE -->
+                <div class="registro-mensaje">
+                    <span class="registro-etiqueta">
+                        <i class="fa-solid fa-user-shield"></i>
+                        Seguridad para tu comunidad
+                    </span>
+
+                    <h1>
+                        Crea tu cuenta y
+                        <span>mantente protegido</span>
+                    </h1>
+
+                    <p>
+                        Regístrate en CoAlerta para reportar emergencias,
+                        recibir avisos cercanos y mantenerte conectado
+                        con tu comunidad.
+                    </p>
+                </div>
+
+                <!-- BENEFICIOS -->
+                <div class="registro-beneficios">
+                    <div class="registro-beneficio">
+                        <div class="registro-beneficio-icono">
+                            <i class="fa-solid fa-bolt"></i>
+                        </div>
+                        <div>
+                            <strong>Alertas rápidas</strong>
+                            <span>Reporta una emergencia en pocos segundos.</span>
+                        </div>
+                    </div>
+
+                    <div class="registro-beneficio">
+                        <div class="registro-beneficio-icono">
+                            <i class="fa-solid fa-location-dot"></i>
+                        </div>
+                        <div>
+                            <strong>Ubicación automática</strong>
+                            <span>Comparte tu ubicación al generar una alerta.</span>
+                        </div>
+                    </div>
+
+                    <div class="registro-beneficio">
+                        <div class="registro-beneficio-icono">
+                            <i class="fa-solid fa-shield-halved"></i>
+                        </div>
+
+                        <div>
+                            <strong>Comunidad conectada</strong>
+                            <span>Mantente informado sobre situaciones cercanas.</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- DECORACIÓN -->
+            <div class="registro-circulo registro-circulo-1"></div>
+            <div class="registro-circulo registro-circulo-2"></div>
+        </section>
+
+        <!-- ===================================
+             LADO DERECHO
+        ==================================== -->
+        <section class="registro-formulario-seccion">
+            <div class="registro-formulario-contenedor">
+
+                <!-- VOLVER -->
+                <a href="../index.html" class="volver-inicio">
+                    <i class="fa-solid fa-arrow-left"></i>
+                    Volver al inicio
+                </a>
+
+                <!-- CABECERA -->
+                <div class="registro-formulario-header">
+                    <div class="registro-icono-mobile">
+                        <i class="fa-solid fa-shield-halved"></i>
+                    </div>
+                    <h2>Crear una cuenta</h2>
+                    <p>Completa tus datos para registrarte en CoAlerta.</p>
+                </div>
+                <p class="campo-ayuda" id="ayudaRegistroGoogle" hidden>
+                    Tu cuenta de Google ya está verificada. Completa tus datos personales para activar CoAlerta; no necesitas crear otra contraseña.
+                </p>
+
+                <!-- FORMULARIO -->
+                <form class="form-registro" id="formRegistro">
+
+                    <!-- NOMBRES -->
+                    <div class="grupo-formulario">
+                        <label for="nombres"> Nombres </label>
+                        <div class="input-con-icono">
+                            <i class="fa-solid fa-user"></i>
+                            <input type="text" id="nombres" name="nombres" placeholder="Ingresa tus nombres" autocomplete="given-name" required>
+                        </div>
+                    </div>
+
+                    <!-- APELLIDOS -->
+                    <div class="grupo-formulario">
+                        <label for="apellidos"> Apellidos </label>
+                        <div class="input-con-icono">
+                            <i class="fa-solid fa-user"></i>
+                            <input type="text" id="apellidos" name="apellidos" placeholder="Ingresa tus apellidos" autocomplete="family-name" required>
+                        </div>
+                    </div>
+
+                    <div class="grupo-formulario">
+                        <label for="dni">DNI</label>
+                        <div class="input-con-icono">
+                            <i class="fa-solid fa-id-card"></i>
+                            <input type="text" id="dni" name="dni" placeholder="8 dígitos" inputmode="numeric"
+                                autocomplete="off" maxlength="8" pattern="[0-9]{8}" required>
+                        </div>
+                        <small class="campo-ayuda">El DNI se valida al finalizar el registro para evitar duplicados.</small>
+                    </div>
+
+                    <!-- TELÉFONO -->
+                    <div class="grupo-formulario">
+                        <label for="telefono"> Número de celular</label>
+                        <div class="input-con-icono">
+                            <i class="fa-solid fa-phone"></i>
+                            <input type="tel" id="telefono" name="telefono" placeholder="987 654 321" autocomplete="tel" inputmode="numeric" maxlength="9" required>
+                        </div>
+                        <small class="campo-ayuda">Se guarda como dato de contacto; no requiere verificación por SMS.</small>
+                    </div>
+
+                    <!-- DIRECCIÓN -->
+                    <div class="grupo-formulario">
+                        <label for="zona"> Dirección de residencia </label>
+                        <div class="input-con-icono">
+                            <i class="fa-solid fa-location-dot"></i>
+                            <input type="text" id="zona" name="zona" placeholder="Calle, número y urbanización" autocomplete="street-address" required>
+                        </div>
+                    </div>
+
+                    <div class="grupo-formulario">
+                        <label for="tipoUsuario">Tipo de usuario</label>
+                        <div class="input-con-icono">
+                            <i class="fa-solid fa-users"></i>
+                            <select id="tipoUsuario" name="tipoUsuario" required>
+                                <option value="vecino">Vecino</option>
+                                <option value="coordinador">Coordinador vecinal</option>
+                                <option value="seguridad">Personal de seguridad</option>
+                            </select>
+                        </div>
+                        <small class="campo-ayuda" id="ayudaTipoUsuario">Los roles de coordinador y seguridad requieren aprobación antes de activar sus permisos.</small>
+                    </div>
+
+                    <!-- CORREO -->
+                    <div class="grupo-formulario">
+                        <label for="correo"> Correo electrónico </label>
+                        <div class="input-con-icono">
+                            <i class="fa-solid fa-envelope"></i>
+                            <input type="email" id="correo" name="correo" placeholder="ejemplo@correo.com" autocomplete="email" required>
+                        </div>
+                    </div>
+
+                    <!-- CONTRASEÑA -->
+                    <div class="grupo-formulario">
+                        <label for="password"> Contraseña </label>
+                        <div class="input-con-icono">
+                            <i class="fa-solid fa-lock"></i>
+                            <input type="password" id="password" name="password" placeholder="Mínimo 8 caracteres" autocomplete="new-password" minlength="8" required>
+                            <button type="button" class="ver-password" aria-label="Mostrar contraseña">
+                                <i class="fa-solid fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- CONFIRMAR CONTRASEÑA -->
+                    <div class="grupo-formulario">
+                        <label for="confirmarPassword"> Confirmar contraseña </label>
+                        <div class="input-con-icono">
+                            <i class="fa-solid fa-lock"></i>
+                            <input type="password" id="confirmarPassword" name="confirmarPassword" placeholder="Repite tu contraseña" autocomplete="new-password" minlength="8" required>
+                            <button type="button" class="ver-password" aria-label="Mostrar contraseña">
+                                <i class="fa-solid fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- TÉRMINOS -->
+                    <div class="registro-terminos">
+                        <label class="checkbox-terminos">
+                            <input type="checkbox" id="terminos" required>
+                            <span>
+                                Acepto los
+                                <a href="terminos.html" target="_blank" rel="noopener noreferrer"> términos y condiciones </a>
+                                y la
+                                <a href="privacidad.html" target="_blank" rel="noopener noreferrer"> política de privacidad </a>.
+                            </span>
+                        </label>
+                    </div>
+
+                    <!-- MENSAJE ERROR (Se añadió aria-live="polite" para accesibilidad) -->
+                    <div class="mensaje-registro" id="mensajeRegistro" aria-live="polite"></div>
+
+                    <!-- BOTÓN CREAR CUENTA -->
+                    <button type="submit" class="btn-crear-cuenta">
+                        <span> Crear cuenta </span>
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+
+                    <!-- IR A LOGIN -->
+                    <div class="registro-login">
+                        <span> ¿Ya tienes una cuenta? </span>
+                        <a href="login.html"> Iniciar sesión </a>
+                    </div>
+                </form>
+
+                <!-- AVISO SEGURIDAD -->
+                <div class="login-aviso">
+                    <i class="fa-solid fa-lock"></i>
+                    <span>Firebase Authentication protege tu contraseña. Nunca se almacena en texto legible en Firestore.</span>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- ===================================
+         JAVASCRIPT
+    ==================================== -->
+    <!-- Firebase SDKs -->
+    <script type="module" src="../js/registro.js?v=google-auth-onboarding-20261030"></script>
+</body>
+</html>

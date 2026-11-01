@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi Comunidad - CoAlerta</title>
+    
+    <!-- Fuente -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Iconos-->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="../css/estilos.css?v=20261028-profile-ui-2">
+    <link rel="stylesheet" href="../css/responsive.css">
+    <link rel="stylesheet" href="../css/mapa.css?v=ordered-panels-gps-dispatch-20261029">
+    <link rel="stylesheet" href="../css/comunidad.css?v=community-mobile-scroll-20261029">
+    <script src="../js/tema.js?v=20261029-theme-scroll"></script>
+</head>
+
+<body class="pagina-comunidad" data-role-navigation-ready="false">
+
+    <!-- HEADER APP -->
+    <header class="mapa-header">
+        <div class="mapa-header-contenido">
+            <!-- LOGO -->
+            <a href="../index.html" class="logo" aria-label="Co Alerta, inicio">
+                <div class="logo-icono">
+                    <i class="fa-solid fa-shield-halved"></i>
+                </div>
+                <div class="logo-texto">
+                    <span class="logo-co">Co</span><span class="logo-alerta">Alerta</span>
+                </div>
+            </a>
+
+            <!-- CENTRO -->
+            <div class="mapa-header-centro">
+                <div class="estado-sistema">
+                    <span class="estado-punto"></span>
+                    Conectado a CoAlerta
+                </div>
+            </div>
+
+            <!-- DERECHA -->
+            <div class="mapa-header-derecha">
+                <button class="boton-header" type="button" title="Notificaciones" id="btnNotificaciones" aria-label="Notificaciones" aria-expanded="false" aria-controls="menuNotificaciones">
+                    <i class="fa-solid fa-bell"></i>
+                    <span class="notificacion-contador" hidden></span>
+                </button>
+
+                <!-- Menú oculto de notificaciones -->
+                <div id="menuNotificaciones" class="menu-notificaciones" hidden>
+                    <h4>Notificaciones</h4>
+                    <div class="notificacion-contenido" id="notificacionesLista" aria-live="polite">
+                        Solicitando permiso para detectar alertas cercanas...
+                    </div>
+                </div>
+                <a class="boton-header" title="Perfil" aria-label="Mi perfil" href="perfil.html">
+                    <i class="fa-solid fa-user"></i>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- LAYOUT PRINCIPAL APP -->
+    <div class="mapa-layout">
+        
+        <!-- SIDEBAR  -->
+        <aside class="mapa-sidebar">
+
+            <!-- USUARIO -->
+            <div class="sidebar-usuario">
+                <div class="usuario-avatar" id="sidebarAvatarContainer">
+                    <i class="fa-solid fa-user" id="sidebarAvatarIcon"></i>
+                    <img id="sidebarAvatarImg" alt="Foto de perfil" hidden>
+                </div>
+                <div>
+                    <strong id="sidebarNombre">Hola, usuario</strong>
+                    <span id="sidebarRol">Vecino</span>
+                </div>
+            </div>
+
+            <!-- MENÚ -->
+            <nav class="sidebar-menu">
+                <a href="mapa.html">
+                    <i class="fa-solid fa-map-location-dot"></i>
+                    <span>Mapa</span>
+                </a>
+                <a href="historial.html">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                    <span>Historial</span>
+                </a>
+                <a href="comunidad.html" class="activo">
+                    <i class="fa-solid fa-users"></i>
+                    <span>Mi comunidad</span>
+                </a>
+                <a href="perfil.html">
+                    <i class="fa-solid fa-user-gear"></i>
+                    <span>Mi perfil</span>
+                </a>
+                <a href="administracion.html" data-admin-only hidden>
+                    <i class="fa-solid fa-user-shield" aria-hidden="true"></i>
+                    <span>Administración</span>
+                </a>
+                <a href="coordinador_vecinal.html" data-role-link="coordinator" hidden>
+                    <i class="fa-solid fa-tower-broadcast" aria-hidden="true"></i>
+                    <span>Panel de coordinación</span>
+                </a>
+                <a href="personal_seguridad.html" data-role-link="security" hidden>
+                    <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
+                    <span>Panel de seguridad</span>
+                </a>
+            </nav>
+
+            <!-- ESTADO -->
+            <div class="sidebar-estado">
+                <div class="sidebar-estado-icono">
+                    <i class="fa-solid fa-shield-halved"></i>
+                </div>
+                <div>
+                    <strong>Zona monitoreada</strong>
+                    <span>Seguridad disponible</span>
+                </div>
+            </div>
+
+            <!-- CERRAR SESIÓN -->
+            <a href="login.html" class="cerrar-sesion" id="btnCerrarSesionLateral">
+                <i class="fa-solid fa-right-from-bracket"></i>
+                Cerrar sesión
+            </a>
+        </aside>
+
+        <!-- CONTENIDO PRINCIPAL -->
+        <main class="mapa-contenido comunidad-contenido">
+            
+            <!-- ÁREA DE COMUNIDAD -->
+            <div class="comunidad-scroll">
+                
+                <!-- Título -->
+                <div class="comunidad-superior">
+                    <h1>Mi comunidad</h1>
+                    <p>Conecta con tus vecinos, mantente informado y construyamos juntos un barrio más seguro.</p>
+                    <div class="comunidad-acciones">
+                        <button id="btn-generar-codigo" type="button" class="btn-secundario-pequeno" onclick="abrirModal('modal-codigo')" hidden>
+                            <i class="fa-solid fa-user-plus"></i> Invitar vecinos
+                        </button>
+                        <button id="btn-unirse-comunidad" type="button" class="btn-secundario-pequeno" onclick="abrirModal('modal-unirse')" hidden>
+                            <i class="fa-solid fa-right-to-bracket"></i> Unirme a una comunidad
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Ubicación y lugares cercanos -->
+                <div class="comunidad-banner card">
+                    <div class="banner-texto">
+                        <h2 id="tituloAreaCercana">Lugares cercanos a tu ubicación</h2>
+                        <p id="estadoUbicacion" aria-live="polite">Buscando lugares cercanos. El navegador te pedirá permiso para usar tu ubicación.</p>
+                        <small>La ubicación se consulta en OpenStreetMap y no se guarda en CoAlerta.</small>
+                    </div>
+                </div>
+
+                <div class="comunidad-estadisticas-grid">
+                    <div class="estadistica-card card">
+                        <div class="est-icono icono-verde-claro"><i class="fa-solid fa-user-group"></i></div>
+                        <div class="est-info">
+                            <h3 id="resumenUbicacion">—</h3>
+                            <p>UBICACIÓN ACTUAL</p>
+                        </div>
+                    </div>
+                    <div class="estadistica-card card">
+                        <div class="est-icono icono-azul-claro"><i class="fa-solid fa-shield-halved"></i></div>
+                        <div class="est-info">
+                            <h3 id="contadorServiciosSeguridad">—</h3>
+                            <p>SERVICIOS DE SEGURIDAD</p>
+                        </div>
+                    </div>
+                    <div class="estadistica-card card">
+                        <div class="est-icono icono-naranja-claro"><i class="fa-solid fa-map-location-dot"></i></div>
+                        <div class="est-info">
+                            <h3 id="contadorZonas">—</h3>
+                            <p>ZONAS CERCANAS</p>
+                        </div>
+                    </div>
+                    <div class="estadistica-card card">
+                        <div class="est-icono icono-esmeralda"><i class="fa-regular fa-face-smile"></i></div>
+                        <div class="est-info">
+                            <h3 id="contadorLugares">—</h3>
+                            <p>LUGARES IMPORTANTES</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Grid Principal (2 Columnas) -->
+                <div class="comunidad-main-grid">
+                    
+                    <!-- Columna Izquierda -->
+                    <div class="comunidad-col-izq">
+                        <!-- Lista de Vecinos -->
+                        <div class="comunidad-lista-card card">
+                            <div class="card-header">
+                                <h3>Miembros de la comunidad</h3>
+                                <a href="#" class="enlace-accion">Ver todos <i class="fa-solid fa-arrow-right"></i></a>
+                            </div>
+                            <!-- CONTENEDOR VACÍO PARA JS -->
+                            <div id="contenedor-vecinos" class="lista-items"></div>
+                        </div>
+
+                        <!-- Anuncios -->
+                        <div class="comunidad-lista-card card">
+                            <div class="card-header">
+                                <h3>Anuncios de la comunidad</h3>
+                                <!-- El botón se ocultará dinámicamente si no eres coordinador -->
+                                <button id="btn-nuevo-anuncio" type="button" onclick="abrirModal('modal-publicar')" class="btn-secundario-pequeno" hidden>Publicar anuncio <i class="fa-solid fa-arrow-right"></i></button>
+                            </div>
+                            <!-- CONTENEDOR VACÍO PARA JS -->
+                            <div id="contenedor-anuncios" class="lista-items"></div>
+                            <div class="avisos-oficiales">
+                                <h4><i class="fa-solid fa-bullhorn" aria-hidden="true"></i> Comunicados oficiales</h4>
+                                <div id="listaAvisosOficiales" class="lista-items" aria-live="polite">
+                                    <p class="sin-datos">No hay comunicados oficiales para tu comunidad.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Columna Derecha -->
+                    <div class="comunidad-col-der">
+                        
+                        <!-- Comisaría y Serenazgo -->
+                        <div class="comunidad-lista-card card">
+                            <div class="card-header">
+                                <h3>Comisarías y Serenazgo cercanos</h3>
+                                <button class="btn-secundario-pequeno" type="button" id="btnActualizarUbicacion">
+                                    <i class="fa-solid fa-location-crosshairs" aria-hidden="true"></i> Actualizar ubicación
+                                </button>
+                            </div>
+                            <div class="lista-items" id="listaServiciosCercanos" aria-live="polite">
+                                <p class="sin-datos">Buscando comisarías y serenazgo cercanos...</p>
+                            </div>
+                        </div>
+
+                        <!-- Zonas y lugares importantes -->
+                        <div class="comunidad-lista-card card">
+                            <div class="card-header">
+                                <h3>Zonas y lugares importantes</h3>
+                                <a href="mapa.html" class="enlace-accion">Abrir mapa <i class="fa-solid fa-arrow-right"></i></a>
+                            </div>
+                            <div class="lista-items" id="listaLugaresCercanos" aria-live="polite">
+                                <p class="sin-datos">Buscando parques, centros de salud, escuelas y zonas cercanas...</p>
+                            </div>
+                            <small class="atribucion-mapa">Datos de lugares © colaboradores de OpenStreetMap.</small>
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+        </main>
+        
+        <!-- ==========================================
+            MODALES (VENTANAS EMERGENTES)
+        =========================================== -->
+        
+        <!-- Modal: Publicar Anuncio -->
+        <div id="modal-publicar" class="modal-overlay">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Publicar nuevo anuncio</h3>
+                    <button class="btn-cerrar-modal" onclick="cerrarModal('modal-publicar')"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-grupo">
+                        <label>Título del anuncio</label>
+                        <input type="text" id="anuncio-titulo" placeholder="Ej: Reunión de seguridad">
+                    </div>
+                    <div class="form-grupo">
+                        <label>Descripción</label>
+                        <textarea id="anuncio-desc" rows="3" placeholder="Detalles del anuncio..."></textarea>
+                    </div>
+                    <button class="btn-principal ancho-completo" onclick="guardarAnuncio()">Publicar ahora</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal: Generar Código (Para Coordinadores) -->
+        <div id="modal-codigo" class="modal-overlay">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Invitar vecinos</h3>
+                    <button class="btn-cerrar-modal" onclick="cerrarModal('modal-codigo')"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="modal-body text-center">
+                    <p>Comparte este código para que un vecino o personal de seguridad se una a tu comunidad:</p>
+                    <div class="codigo-caja">
+                        <h2 id="codigo-generado">—</h2>
+                    </div>
+                    <button class="btn-principal ancho-completo" onclick="copiarCodigo()"><i class="fa-regular fa-copy"></i> Copiar Código</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal: Unirse a Comunidad (Para Vecinos) -->
+        <div id="modal-unirse" class="modal-overlay">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Unirse a una comunidad</h3>
+                    <button class="btn-cerrar-modal" onclick="cerrarModal('modal-unirse')"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-grupo">
+                        <label>Código de invitación</label>
+                        <input type="text" id="codigo-ingresado" placeholder="Código de 24 caracteres"
+                            maxlength="24" autocapitalize="characters" autocomplete="off">
+                    </div>
+                    <button class="btn-principal ancho-completo" onclick="procesarUnion()">Verificar y Unirme</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal: Perfil de Vecino -->
+        <div id="modal-perfil-vecino" class="modal-overlay">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Perfil del Vecino</h3>
+                    <button class="btn-cerrar-modal" onclick="cerrarModal('modal-perfil-vecino')"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="modal-body text-center">
+                    <div id="perfil-iniciales" class="avatar-letras avatar-azul modal-avatar">U</div>
+                    <h3 id="perfil-nombre" style="margin-top: 10px;">Vecino</h3>
+                    <span id="perfil-rol" class="badge badge-activo">Vecino</span>
+                    <p id="perfil-fecha-ingreso" class="perfil-miembro-detalle"></p>
+                    <a id="perfil-telefono" class="perfil-miembro-telefono" hidden></a>
+                </div>
+            </div>
+        </div>
+
+            <!-- Menú inferior móvil (Igual al mapa) -->
+            <nav class="menu-inferior-mobile" aria-label="Navegación móvil">
+                <a href="mapa.html">
+                    <i class="fa-solid fa-map-location-dot" aria-hidden="true"></i><span>Mapa</span>
+                </a>
+                <a href="historial.html">
+                    <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i><span>Historial</span>
+                </a>
+                <a href="comunidad.html" class="activo" aria-current="page">
+                    <i class="fa-solid fa-users" aria-hidden="true"></i><span>Comunidad</span>
+                </a>
+                <a href="perfil.html">
+                    <i class="fa-solid fa-user" aria-hidden="true"></i><span>Perfil</span>
+                </a>
+                <a href="coordinador_vecinal.html" data-role-link="coordinator" hidden>
+                    <i class="fa-solid fa-tower-broadcast" aria-hidden="true"></i><span>Coordinación</span>
+                </a>
+                <a href="personal_seguridad.html" data-role-link="security" hidden>
+                    <i class="fa-solid fa-shield-halved" aria-hidden="true"></i><span>Seguridad</span>
+                </a>
+                <a href="administracion.html" data-admin-only hidden>
+                    <i class="fa-solid fa-user-shield" aria-hidden="true"></i><span>Admin</span>
+                </a>
+            </nav>
+    </div>
+    <!-- Firebase modular -->
+    <script type="module" src="../js/estado-cuenta.js?v=modular-sdk-1"></script>
+    <script src="../js/ubicacion.js"></script>
+    <script src="../js/notificaciones.js?v=20261029-notifications-read-v2"></script>
+    <script type="module" src="../js/coalerta-data.js?v=hide-firebase-details-20261101"></script>
+    <script type="module" src="../js/comunidad.js?v=community-invite-button-20261029"></script>
+</body>
+</html>
