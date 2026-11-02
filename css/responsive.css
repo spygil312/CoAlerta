@@ -1,0 +1,95 @@
+/* =========================================================
+   COALERTA - RESPONSIVE.CSS (VERSIÓN OPTIMIZADA)
+========================================================= */
+
+@media (max-width: 1200px) {
+    .contenedor { width: min(94%, 1100px); }
+    .hero-contenido { gap: 45px; }
+    .hero-texto h1 { font-size: 54px; }
+    .beneficios-grid { gap: 16px; }
+    .mapa-principal-grid { grid-template-columns: minmax(0, 1fr) 320px; }
+    .perfil-grid { grid-template-columns: 250px minmax(0, 1fr); }
+}
+
+@media (max-width: 1050px) {
+    .menu, .header-botones { display: none; }
+    .menu-mobile { display: block; }
+
+    .hero { padding: 70px 0; }
+    .hero-contenido { grid-template-columns: 1fr; gap: 50px; }
+    .hero-texto { text-align: center; }
+    .hero-botones, .hero-seguridad, .hero-panel { justify-content: center; }
+    .panel-app { width: min(100%, 520px); }
+
+    .beneficios-grid { grid-template-columns: repeat(2, 1fr); }
+    .pasos { gap: 15px; }
+    .seguridad-contenido { gap: 35px; }
+    .footer-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 900px) {
+    .hero-texto h1 { font-size: 48px; }
+    .beneficios, .como-funciona, .seguridad { padding: 70px 0; }
+    .seguridad-contenido { grid-template-columns: 1fr; }
+    .seguridad-card { max-width: 520px; margin: auto; }
+    .cta-contenido { gap: 20px; }
+    .historial-estadisticas { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 768px) {
+    html { scroll-padding-top: 70px; }
+
+    .header-contenido { min-height: 66px; }
+    .logo-icono { width: 39px; height: 39px; }
+    .logo-texto { font-size: 20px; }
+
+    .hero { padding: 55px 0; }
+    .hero-texto h1 { font-size: 42px; letter-spacing: -1.4px; }
+    .hero-botones { flex-direction: column; }
+    .btn-principal, .btn-secundario { width: 100%; }
+    .hero-seguridad { grid-template-columns: 1fr; justify-items: center; }
+    .panel-app { padding: 18px; }
+    .alertas-grid { gap: 8px; }
+
+    .titulo-seccion h2, .seguridad-info h2 { font-size: 34px; }
+    .beneficios-grid { grid-template-columns: 1fr; }
+    .pasos { grid-template-columns: 1fr; }
+    .cta-contenido { flex-direction: column; align-items: flex-start; }
+    .footer-grid { grid-template-columns: 1fr; gap: 30px; }
+
+    .login-formulario-seccion, .registro-formulario-seccion {
+        padding: 28px 18px;
+    }
+    .login-formulario-header h2, .registro-formulario-header h2 { font-size: 28px; }
+    .login-opciones { flex-direction: column; align-items: flex-start; }
+
+    .mapa-layout { grid-template-columns: 1fr; }
+    .perfil-grid { grid-template-columns: 1fr; }
+    .perfil-resumen-card { max-width: 520px; width: 100%; margin: 0 auto; }
+}
+
+@media (max-width: 600px) {
+    .contenedor { width: 92%; }
+    .hero-texto h1 { font-size: 37px; }
+    .etiqueta { font-size: 11px; }
+    .alertas-grid { grid-template-columns: 1fr; }
+    .historial-estadisticas { grid-template-columns: 1fr; }
+    .mapa-superior h1, .historial-superior h1, .perfil-superior h1 { font-size: 27px; }
+    .mapa-card, #map { min-height: 420px; height: 420px; }
+}
+
+@media (max-width: 480px) {
+    .logo-texto { font-size: 18px; }
+    .logo-icono { width: 37px; height: 37px; border-radius: 10px; }
+    .hero { padding: 45px 0; }
+    .hero-texto h1 { font-size: 33px; }
+    .titulo-seccion h2, .seguridad-info h2 { font-size: 29px; }
+    .beneficios, .como-funciona, .seguridad { padding: 55px 0; }
+    .mapa-contenido, .historial-contenido, .perfil-contenido { padding: 14px; }
+    .mapa-superior h1, .historial-superior h1, .perfil-superior h1 { font-size: 24px; }
+}
+
+@media (max-width: 380px) {
+    .hero-texto h1 { font-size: 30px; }
+    .modal-alertas-grid { grid-template-columns: 1fr; }
+}

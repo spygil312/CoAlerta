@@ -1,0 +1,222 @@
+:root {
+    font-family: Inter, sans-serif;
+    color: #172b2a;
+    background: #f3f6f7;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+}
+
+* { box-sizing: border-box; }
+
+body { margin: 0; min-width: 320px; min-height: 100vh; }
+
+button, a { font: inherit; }
+
+.seguridad-main { width: 100%; margin: 0; padding: 30px; }
+
+.seguridad-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 22px;
+}
+
+.seguridad-eyebrow { margin: 0 0 8px; color: #16835d; font-size: 11px; font-weight: 800; letter-spacing: .12em; }
+.seguridad-heading h1 { margin: 0; color: #123c35; font-size: clamp(24px, 4vw, 34px); }
+.seguridad-heading p:last-child { max-width: 700px; margin: 9px 0 0; color: #657574; line-height: 1.55; }
+
+.seguridad-status {
+    padding: 9px 12px;
+    border-radius: 999px;
+    background: #fff4d8;
+    color: #76520c;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.seguridad-status[data-state="connected"] { background: #e4f4ed; color: #126547; }
+.seguridad-status[data-state="error"] { background: #fde8e7; color: #a3211a; }
+
+.seguridad-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    margin-bottom: 18px;
+}
+
+.seguridad-metrics article, .seguridad-panel {
+    border: 1px solid #e0e8e7;
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 5px 20px rgba(24, 55, 50, .04);
+}
+
+.seguridad-metrics article { display: grid; gap: 9px; padding: 18px; }
+.seguridad-metrics span { color: #657574; font-size: 12px; font-weight: 700; }
+.seguridad-metrics strong { color: #123c35; font-size: 25px; }
+
+.seguridad-grid { display: grid; grid-template-columns: minmax(0, .92fr) minmax(0, 1.08fr); gap: 18px; align-items: start; }
+.seguridad-panel { min-width: 0; padding: 18px; }
+.seguridad-panel-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; margin-bottom: 15px; }
+.seguridad-panel h2 { margin: 0; color: #183c36; font-size: 18px; }
+.seguridad-panel-heading p { margin: 6px 0 0; color: #73817f; font-size: 12px; line-height: 1.5; }
+
+.seguridad-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 38px;
+    padding: 9px 12px;
+    border: 1px solid #126b4f;
+    border-radius: 9px;
+    background: #126b4f;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.seguridad-button:hover { background: #0e573f; }
+.seguridad-button:disabled { opacity: .55; cursor: not-allowed; }
+.seguridad-button-light { border-color: #d7e2df; background: #f7faf9; color: #29443f; }
+.seguridad-button-light:hover { background: #edf4f2; }
+
+.seguridad-alert-list { display: grid; gap: 10px; }
+.seguridad-alert-card { padding: 13px; border: 1px solid #e1e9e7; border-left: 4px solid #435d57; border-radius: 11px; }
+.seguridad-alert-card[data-category="robo"] { border-left-color: #d63d3d; }
+.seguridad-alert-card[data-category="sospecha"] { border-left-color: #d99a00; }
+.seguridad-alert-card[data-category="accidente"] { border-left-color: #2774c8; }
+.seguridad-alert-card[data-category="incendio"] { border-left-color: #e26424; }
+.seguridad-alert-card[data-selected="true"] { border-color: #16835d; box-shadow: 0 0 0 2px rgba(22, 131, 93, .12); }
+.seguridad-alert-select { width: 100%; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.seguridad-alert-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.seguridad-alert-identity { display: flex; align-items: center; min-width: 0; gap: 9px; }
+.seguridad-alert-icon { display: grid; flex: 0 0 34px; width: 34px; height: 34px; place-items: center; border-radius: 10px; color: #fff; }
+.seguridad-alert-identity strong { min-width: 0; overflow-wrap: anywhere; }
+.seguridad-alert-title strong { color: #183c36; font-size: 14px; }
+.seguridad-alert-state { padding: 4px 7px; border-radius: 999px; background: #eef4f2; color: #435d57; font-size: 10px; font-weight: 800; }
+.seguridad-alert-card p { margin: 8px 0 0; color: #657574; font-size: 12px; line-height: 1.5; }
+.seguridad-card-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 11px; }
+.seguridad-card-actions select { min-height: 36px; max-width: 100%; padding: 6px 8px; border: 1px solid #d7e2df; border-radius: 8px; color: #29443f; }
+.seguridad-empty { padding: 20px; color: #73817f; text-align: center; font-size: 13px; }
+.seguridad-notice { padding: 11px; border-radius: 9px; background: #fff4d8; color: #76520c; font-size: 12px; line-height: 1.5; }
+.seguridad-dispatch-notice { margin: 0 0 12px; }
+.seguridad-dispatch-notice[data-estado="correcto"] { background: #e4f4ed; color: #126547; }
+
+#mapaSeguridad { position: relative; width: 100%; height: 390px; overflow: hidden; border-radius: 11px; background: #e7efec; isolation: isolate; }
+.seguridad-patrol-marker { color: #1267d6; font-size: 24px; line-height: 20px; text-align: center; text-shadow: 0 1px 3px #fff; }
+.seguridad-map-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.seguridad-hint { min-height: 18px; margin: 9px 0 0; color: #657574; font-size: 12px; line-height: 1.5; }
+
+@media (max-width: 1100px) {
+    .seguridad-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 560px) {
+    .seguridad-heading { flex-direction: column; }
+    .seguridad-status { white-space: normal; }
+    .seguridad-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .seguridad-metrics article { min-width: 0; padding: 12px; }
+    .seguridad-metrics article:last-child { grid-column: 1 / -1; }
+    .seguridad-main { padding: 16px 12px; }
+    .seguridad-panel { padding: 13px; }
+    .seguridad-panel-heading { flex-direction: column; }
+    .seguridad-panel-heading > button { align-self: flex-start; }
+    .seguridad-alert-title { align-items: flex-start; }
+    .seguridad-alert-state { flex: 0 0 auto; }
+    .seguridad-card-actions select { flex: 1 1 100%; }
+    #mapaSeguridad { height: 320px; }
+}
+
+@media (max-width: 768px) {
+    .pagina-seguridad .mapa-layout {
+        display: block;
+        height: auto;
+        min-height: calc(100dvh - 65px);
+        overflow: visible;
+        padding: 0 0 calc(82px + env(safe-area-inset-bottom));
+    }
+
+    .pagina-seguridad .seguridad-main {
+        position: static;
+        display: block;
+        height: auto;
+        min-height: 0;
+        overflow: visible;
+    }
+}
+
+.pagina-seguridad .cerrar-sesion {
+    width: 100%;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+}
+
+:root[data-theme="dark"] .seguridad-main,
+:root[data-theme="dark"] .seguridad-grid,
+:root[data-theme="dark"] .seguridad-panel,
+:root[data-theme="dark"] .seguridad-metrics article,
+:root[data-theme="dark"] .seguridad-alert-card {
+    color: var(--texto);
+}
+
+:root[data-theme="dark"] .seguridad-panel,
+:root[data-theme="dark"] .seguridad-metrics article,
+:root[data-theme="dark"] .seguridad-alert-card {
+    border-color: var(--borde);
+    background: var(--blanco);
+    box-shadow: var(--sombra-suave);
+}
+
+:root[data-theme="dark"] .seguridad-heading h1,
+:root[data-theme="dark"] .seguridad-metrics strong,
+:root[data-theme="dark"] .seguridad-panel h2,
+:root[data-theme="dark"] .seguridad-alert-title strong {
+    color: var(--texto);
+}
+
+:root[data-theme="dark"] .seguridad-heading p:last-child,
+:root[data-theme="dark"] .seguridad-metrics span,
+:root[data-theme="dark"] .seguridad-panel-heading p,
+:root[data-theme="dark"] .seguridad-alert-card p,
+:root[data-theme="dark"] .seguridad-hint,
+:root[data-theme="dark"] .seguridad-empty {
+    color: var(--texto-secundario);
+}
+
+:root[data-theme="dark"] .seguridad-alert-state,
+:root[data-theme="dark"] .seguridad-button-light {
+    border-color: var(--borde);
+    background: var(--fondo-2);
+    color: var(--texto);
+}
+
+:root[data-theme="dark"] .seguridad-notice {
+    background: #3e341e;
+    color: #ffe08a;
+}
+
+:root[data-theme="dark"] .seguridad-dispatch-notice[data-estado="correcto"] {
+    background: #1d4334;
+    color: #b6f0ce;
+}
+
+:root[data-theme="dark"] .seguridad-status {
+    background: #3e341e;
+    color: #ffe08a;
+}
+
+:root[data-theme="dark"] .seguridad-status[data-state="connected"] {
+    background: #1d4334;
+    color: #b6f0ce;
+}
+
+:root[data-theme="dark"] .seguridad-status[data-state="error"] {
+    background: #4a292a;
+    color: #ffb4ae;
+}
