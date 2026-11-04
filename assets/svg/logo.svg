@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">CoAlerta</title>
+  <defs>
+    <linearGradient id="shield" x1="10" y1="8" x2="54" y2="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#20a875"/>
+      <stop offset="1" stop-color="#0d6048"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#shield)" d="M32 3 57 12v18c0 15-10.7 25.8-25 31C17.7 55.8 7 45 7 30V12L32 3Z"/>
+  <path fill="#fff" d="M32 10 50 16v14c0 10.8-7.3 19.1-18 23.8C21.3 49.1 14 40.8 14 30V16l18-6Z"/>
+  <path fill="#13845d" d="M32 15 45 19.3V30c0 7.6-4.8 13.8-13 17.9C23.8 43.8 19 37.6 19 30V19.3L32 15Z"/>
+  <path fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="4" d="m25 31 5 5 10-11"/>
+</svg>
