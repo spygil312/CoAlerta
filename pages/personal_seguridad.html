@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,35 +12,37 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <link rel="icon" type="image/svg+xml" href="../assets/svg/logo.svg?v=2">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-    <script>
-        (function () {
-        try {
-            const profile = JSON.parse(localStorage.getItem("coalerta_usuario") || "null");
-            const cachedRole = JSON.parse(localStorage.getItem("userRole") || "null");
-            if (localStorage.getItem("coalertaSesion") === "activa" &&
-                profile && cachedRole && profile.uid === cachedRole.uid &&
-                String(profile.rol || "").trim().toLowerCase() === cachedRole.role) {
-                if (cachedRole.isAdmin === true) document.documentElement.classList.add("role-admin");
-                if (cachedRole.isAdmin === true ||
-                    ["coordinador", "administrador", "admin"].includes(cachedRole.role)) {
-                    document.documentElement.classList.add("role-coordinator");
-                }
-                if (cachedRole.isAdmin === true ||
-                    ["agente", "seguridad", "administrador", "admin"].includes(cachedRole.role)) {
-                    document.documentElement.classList.add("role-security");
-                }
-            }
-        } catch (error) {
-            console.warn("No se pudo recuperar el rol guardado para el menú:", error);
-        }
-        })();
-    </script>
     <link rel="stylesheet" href="../css/estilos.css?v=mobile-nav-fixed-20261102">
     <link rel="stylesheet" href="../css/responsive.css">
     <link rel="stylesheet" href="../css/mapa.css?v=ordered-panels-gps-dispatch-20261029">
-    <link rel="stylesheet" href="../css/personal-seguridad.css?v=ordered-panels-gps-dispatch-20261029">
+    <link rel="stylesheet" href="../css/personal-seguridad.css?v=maps-navigation-link-20261110">
+
+    <script>
+        (function () {
+            try {
+                const profile = JSON.parse(localStorage.getItem("coalerta_usuario") || "null");
+                const cachedRole = JSON.parse(localStorage.getItem("userRole") || "null");
+                if (localStorage.getItem("coalertaSesion") === "activa" &&
+                    profile && cachedRole && profile.uid === cachedRole.uid &&
+                    String(profile.rol || "").trim().toLowerCase() === cachedRole.role) {
+                    if (cachedRole.isAdmin === true) document.documentElement.classList.add("role-admin");
+                    if (cachedRole.isAdmin === true ||
+                        ["coordinador", "administrador", "admin"].includes(cachedRole.role)) {
+                        document.documentElement.classList.add("role-coordinator");
+                    }
+                    if (cachedRole.isAdmin === true ||
+                        ["agente", "seguridad", "administrador", "admin"].includes(cachedRole.role)) {
+                        document.documentElement.classList.add("role-security");
+                    }
+                }
+            } catch (error) {
+                console.warn("No se pudo recuperar el rol guardado para el menú:", error);
+            }
+        })();
+    </script>
     <script src="../js/tema.js?v=dark-theme-nav-order-20261029"></script>
 </head>
+
 <body class="pagina-seguridad" data-role-navigation-ready="false">
     <header class="mapa-header">
         <div class="mapa-header-contenido">
@@ -54,8 +57,10 @@
                 </div>
             </div>
             <div class="mapa-header-derecha">
-                <button class="boton-header" type="button" id="btnNotificaciones" title="Notificaciones" aria-label="Notificaciones" aria-expanded="false" aria-controls="menuNotificaciones">
-                    <i class="fa-solid fa-bell" aria-hidden="true"></i><span class="notificacion-contador" hidden></span>
+                <button class="boton-header" type="button" id="btnNotificaciones" title="Notificaciones"
+                    aria-label="Notificaciones" aria-expanded="false" aria-controls="menuNotificaciones">
+                    <i class="fa-solid fa-bell" aria-hidden="true"></i><span class="notificacion-contador"
+                        hidden></span>
                 </button>
                 <div id="menuNotificaciones" class="menu-notificaciones" hidden>
                     <h4>Notificaciones</h4>
@@ -128,7 +133,8 @@
                 <div>
                     <p class="seguridad-eyebrow">CENTRO DE RESPUESTA</p>
                     <h1>Panel de personal de seguridad</h1>
-                    <p>Revisa alertas derivadas, comparte la ubicación de tu unidad y registra el resultado de la atención.</p>
+                    <p>Revisa alertas derivadas, comparte la ubicación de tu unidad y registra el resultado de la
+                        atención.</p>
                 </div>
                 <span id="estadoSeguridad" class="seguridad-status" role="status">Conectando con Firebase…</span>
             </section>
@@ -146,12 +152,14 @@
                             <h2>Cola de atención</h2>
                             <p>Selecciona una alerta para consultar sus detalles y ubicación.</p>
                         </div>
-                        <button class="seguridad-button seguridad-button-light" id="btnActualizarSeguridad" type="button">
+                        <button class="seguridad-button seguridad-button-light" id="btnActualizarSeguridad"
+                            type="button">
                             <i class="fa-solid fa-rotate" aria-hidden="true"></i> Actualizar
                         </button>
                     </div>
                     <p id="avisoUnidad" class="seguridad-notice" hidden></p>
-                    <p id="avisoDespacho" class="seguridad-notice seguridad-dispatch-notice" role="status" aria-live="polite">
+                    <p id="avisoDespacho" class="seguridad-notice seguridad-dispatch-notice" role="status"
+                        aria-live="polite">
                         Requiere unidad asignada y GPS activo actualizado en los últimos 5 minutos.
                     </p>
                     <div id="listaAlertasSeguridad" class="seguridad-alert-list" aria-live="polite">
@@ -169,13 +177,16 @@
                     <div id="mapaSeguridad" aria-label="Mapa de alertas y ruta de respuesta"></div>
                     <div class="seguridad-map-actions">
                         <button class="seguridad-button" id="btnUbicacionUnidad" type="button">
-                            <i class="fa-solid fa-location-crosshairs" aria-hidden="true"></i> Compartir ubicación de unidad
+                            <i class="fa-solid fa-location-crosshairs" aria-hidden="true"></i> Compartir ubicación de
+                            unidad
                         </button>
-                        <button class="seguridad-button seguridad-button-light" id="btnDetenerUbicacion" type="button" disabled>
+                        <button class="seguridad-button seguridad-button-light" id="btnDetenerUbicacion" type="button"
+                            disabled>
                             Detener ubicación
                         </button>
                     </div>
-                    <p id="estadoUbicacionSeguridad" class="seguridad-hint" role="status">La ubicación no se está compartiendo.</p>
+                    <p id="estadoUbicacionSeguridad" class="seguridad-hint" role="status">La ubicación no se está
+                        compartiendo.</p>
                     <p id="estadoRutaSeguridad" class="seguridad-hint" role="status"></p>
                 </section>
             </section>
@@ -209,7 +220,8 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script type="module" src="../js/estado-cuenta.js?v=modular-sdk-1"></script>
     <script type="module" src="../js/coalerta-data.js?v=active-delegation-role-20261101"></script>
-    <script src="../js/notificaciones.js?v=20261029-notifications-read-v2"></script>
-    <script type="module" src="../js/personal-seguridad.js?v=open-alerts-permission-guidance-20261102"></script>
+    <script src="../js/notificaciones.js?v=expire-notifications-20261110"></script>
+    <script type="module" src="../js/personal-seguridad.js?v=recover-incident-coordinates-20261110"></script>
 </body>
+
 </html>

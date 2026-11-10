@@ -6,14 +6,18 @@ document.addEventListener("DOMContentLoaded", function () {
     const progress = document.getElementById("cuentaRegresivaProgreso");
     const cancelButton = document.getElementById("btnCancelarAlerta");
     const feedback = document.getElementById("estadoEnvioAlerta");
+    const gpsConsent = document.getElementById("consentimientoGPS");
     const detailInput = document.getElementById("detalleEmergencia");
     const detailCounter = document.getElementById("contadorDetalleEmergencia");
     let activeTimer = null;
-    let readinessCheckPending = false;
     let selectedCategory = "";
     let responseRendered = false;
     let lastResponse = "";
     let recentlySubmittedAlert = null;
+    let assignedPatrolId = "";
+    let assignedPatrolUnsubscribe = null;
+    let assignedPatrol = null;
+    let responseEtaTimer = null;
 
     if (detailInput && detailCounter) {
         detailInput.addEventListener("input", function () {
@@ -26,7 +30,13 @@ document.addEventListener("DOMContentLoaded", function () {
     window.addEventListener("coalerta:mapa-alertas-actualizadas", renderAlerts);
     window.addEventListener("coalerta:mis-alertas-actualizadas", renderAlerts);
     window.addEventListener("coalerta:datos-listos", renderAlerts);
-    window.addEventListener("coalerta:sesion-cambiada", renderAlerts);
+    window.addEventListener("coalerta:sesion-cambiada", function () {
+        recentlySubmittedAlert = null;
+        configureAssignedPatrolListener(null);
+        updateAlertEmissionLock(null);
+        renderAlerts();
+    });
+    window.addEventListener("pagehide", () => configureAssignedPatrolListener(null), { once: true });
     window.addEventListener("coalerta:ubicacion-mapa-actualizada", renderAlerts);
     window.addEventListener("coalerta:alerta-reportada", function (event) {
         recentlySubmittedAlert = event.detail && event.detail.alerta || null;
@@ -34,6 +44,14 @@ document.addEventListener("DOMContentLoaded", function () {
     });
     window.addEventListener("coalerta:error", function (event) {
         const detail = event.detail || {};
+        if (detail.area === "delegación") {
+            const ownAlerts = window.coalertaData
+                ? window.coalertaData.getMyAlerts()
+                : [];
+            updateAlertEmissionLock(getLatestActiveOwnAlert(ownAlerts));
+            renderAlerts();
+            return;
+        }
         if (!["alertas públicas", "tus alertas", "perfil"].includes(detail.area)) return;
         const list = document.getElementById("alertasLista");
         if (list) list.replaceChildren(makeEmpty(
@@ -43,15 +61,24 @@ document.addEventListener("DOMContentLoaded", function () {
 
     document.querySelectorAll(".modal-alerta-btn").forEach((button) => {
         button.addEventListener("click", function () {
+            unlockEmergencyAudio();
             if (!button.dataset.emergencia) return;
             startCountdown(button.dataset.emergencia);
         });
     });
+    ["btnEmergencia", "btnEmergenciaMobile"].forEach((id) => {
+        const button = document.getElementById(id);
+        if (button) button.addEventListener("click", unlockEmergencyAudio);
+    });
 
     if (cancelButton) cancelButton.addEventListener("click", cancelCountdown);
+    window.cancelAlertCountdown = function () {
+        if (activeTimer) cancelCountdown();
+    };
     window.resetAlertModal = function () {
         if (activeTimer) window.clearInterval(activeTimer);
         activeTimer = null;
+        if (detailInput) detailInput.disabled = false;
         selectedCategory = "";
         if (grid) grid.hidden = false;
         if (countdown) countdown.hidden = true;
@@ -59,9 +86,11 @@ document.addEventListener("DOMContentLoaded", function () {
             feedback.hidden = true;
             feedback.textContent = "";
         }
+        if (gpsConsent) gpsConsent.checked = false;
         if (detailInput) detailInput.value = "";
         if (detailCounter) detailCounter.textContent = "0";
         if (progress) progress.style.width = "0%";
+        updateAlertEmissionLock(getLatestActiveOwnAlert());
     };
     const refresh = document.getElementById("btnActualizar");
     if (refresh) {
@@ -102,23 +131,26 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-    async function startCountdown(category) {
-        if (readinessCheckPending || activeTimer) return;
+    function startCountdown(category) {
+        if (activeTimer) return;
+        const activeOwnAlert = getLatestActiveOwnAlert();
+        if (activeOwnAlert) {
+            updateAlertEmissionLock(activeOwnAlert);
+            renderUserResponse(window.coalertaData.getMyAlerts());
+            return;
+        }
+        if (!gpsConsent || !gpsConsent.checked) {
+            showFailure("Debes aceptar el uso de tu ubicación GPS para enviar el reporte.");
+            return;
+        }
         if (!window.coalertaData) {
             showFailure("No se pudo iniciar la conexión con Firebase. Recarga la página.");
             return;
         }
-        readinessCheckPending = true;
-        try {
-            showFeedback("Confirmando tu sesión con Firebase…", "info");
-            await window.coalertaData.waitForReady();
-        } catch (error) {
-            readinessCheckPending = false;
-            showFailure(getUserFacingError(error, "No se pudo confirmar tu sesión. Inténtalo de nuevo."));
+        if (!navigator.geolocation || !window.isSecureContext) {
+            showFailure("La ubicación requiere un navegador compatible y una conexión HTTPS. No se envió ninguna alerta.");
             return;
         }
-        readinessCheckPending = false;
-        if (activeTimer) window.clearInterval(activeTimer);
         selectedCategory = category;
         if (grid) grid.hidden = true;
         if (feedback) {
@@ -126,8 +158,17 @@ document.addEventListener("DOMContentLoaded", function () {
             feedback.textContent = "";
         }
         if (countdown) countdown.hidden = false;
-        if (navigator.vibrate) navigator.vibrate(80);
+        if (countdownNumber) countdownNumber.textContent = "3";
+        if (progress) progress.style.width = "0%";
+        if (detailInput) detailInput.disabled = true;
 
+        const positionResult = new Promise((resolve) => {
+            navigator.geolocation.getCurrentPosition(
+                (position) => resolve({ position }),
+                (error) => resolve({ error }),
+                { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+            );
+        });
         const startedAt = Date.now();
         const duration = 3000;
         activeTimer = window.setInterval(function () {
@@ -138,7 +179,8 @@ document.addEventListener("DOMContentLoaded", function () {
             if (remaining <= 0) {
                 window.clearInterval(activeTimer);
                 activeTimer = null;
-                submitAlert(selectedCategory);
+                if (navigator.vibrate) navigator.vibrate([100, 50, 180]);
+                submitAlert(selectedCategory, positionResult);
             }
         }, 50);
     }
@@ -150,76 +192,86 @@ document.addEventListener("DOMContentLoaded", function () {
         if (grid) grid.hidden = false;
         if (progress) progress.style.width = "0%";
         if (feedback) {
-            feedback.textContent = "Alerta cancelada. No se envió al servidor.";
+            feedback.textContent = "Alerta cancelada";
             feedback.className = "estado-envio-alerta estado-envio-info";
             feedback.hidden = false;
         }
-        if (navigator.vibrate) navigator.vibrate(40);
     }
 
-    function submitAlert(category) {
-        if (!navigator.geolocation) {
-            showFailure("Este navegador no permite obtener GPS. No se creó la alerta.");
+    async function submitAlert(category, positionResult) {
+        if (!gpsConsent || !gpsConsent.checked) {
+            showFailure("Debes aceptar el uso de tu ubicación GPS para enviar el reporte.");
             return;
         }
-        showFeedback("Obteniendo GPS de alta precisión…", "info");
-        navigator.geolocation.getCurrentPosition(async function (position) {
-            try {
-                const payload = {
-                    tipo: category,
-                    detalle: detailInput ? detailInput.value.trim() : "",
-                    latitud: position.coords.latitude,
-                    longitud: position.coords.longitude,
-                    precisionMetros: position.coords.accuracy
-                };
-                const payloadSize = new TextEncoder().encode(JSON.stringify(payload)).length;
-                if (payloadSize > 2048) throw new Error("El paquete de alerta supera el límite de 2 KB.");
-                await window.coalertaData.waitForReady();
-                showFeedback("Registrando la alerta en CoAlerta…", "info");
-                const result = await window.coalertaData.createAlert(payload);
-                const submittedAlert = {
-                    ...payload,
-                    id: result.incidentId,
-                    estado: "Recibido en servidor",
-                    prioridad: category === "sospecha" ? "Media" : "Alta",
-                    reportes: 1,
-                    timestamp: new Date().toISOString(),
-                    uid: window.coalertaData.getProfile().uid,
-                    esReporteReciente: true
-                };
-                window.dispatchEvent(new CustomEvent("coalerta:alerta-reportada", {
-                    detail: { alerta: submittedAlert }
-                }));
-                if (navigator.vibrate) navigator.vibrate([100, 50, 180]);
-                const precision = Math.round(position.coords.accuracy);
-                const precisionNotice = precision > 5000
-                    ? " La ubicación es aproximada; intenta reportar desde un lugar abierto para mejorarla."
-                    : "";
-                showFeedback(
-                    `Alerta registrada en CoAlerta. Código: ${result.incidentId}. ` +
-                    `Precisión GPS informada ±${precision} m.${precisionNotice}`,
-                    "success"
+        showFeedback("Enviando ...", "info", "fa-regular fa-clock");
+        try {
+            const result = await positionResult;
+            if (result.error) {
+                console.error("No se pudo obtener el GPS de la alerta:", result.error);
+                if (result.error.code === 1 || result.error.code === 2) {
+                    throw new Error(
+                        "Activa la ubicación en los ajustes del dispositivo y permite el acceso en el navegador. No se envió ninguna alerta."
+                    );
+                }
+                throw new Error(
+                    "La ubicación tardó demasiado. Inténtalo nuevamente en un lugar con señal GPS. No se envió ninguna alerta."
                 );
-                if (countdown) countdown.hidden = true;
-                if (grid) grid.hidden = true;
-                if (detailInput) detailInput.value = "";
-                if (detailCounter) detailCounter.textContent = "0";
-            } catch (error) {
-                console.error("No se pudo enviar la alerta al servidor:", error);
-                showFailure(getUserFacingError(
-                    error,
-                    "No se pudo transmitir la alerta. Verifica tu conexión e inténtalo de nuevo."
-                ));
             }
-        }, function (error) {
-            console.error("No se pudo obtener el GPS de la alerta:", error);
-            const message = error.code === 1
-                ? "Permite el acceso a la ubicación y vuelve a intentar. No se envió ninguna alerta."
-                : error.code === 3
-                    ? "La ubicación tardó demasiado. Inténtalo nuevamente en un lugar con señal GPS."
-                    : "No se pudo determinar tu ubicación. No se envió ninguna alerta.";
-            showFailure(message);
-        }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+            const position = result.position;
+            const precisionMetros = esEntornoLocal()
+                ? 4
+                : position.coords.accuracy;
+            if (!Number.isFinite(precisionMetros) || precisionMetros >= 5) {
+                throw new Error(
+                    `La precisión GPS debe ser menor a 5 metros (actual: ±${Number(precisionMetros).toFixed(2)} m). Busca una señal más precisa e inténtalo nuevamente. No se envió ninguna alerta.`
+                );
+            }
+            if (!gpsConsent || !gpsConsent.checked) {
+                throw new Error("Debes aceptar el uso de tu ubicación GPS para enviar el reporte.");
+            }
+
+            const normalizedCategory = window.coalertaData.normalizeCategory(category);
+            const payload = {
+                tipo: category,
+                codigoCategoria: window.coalertaData.categoryCode(normalizedCategory),
+                detalle: detailInput ? detailInput.value.trim() : "",
+                latitud: position.coords.latitude,
+                longitud: position.coords.longitude,
+                precisionMetros,
+                consentimientoGPS: gpsConsent.checked
+            };
+            const payloadSize = new TextEncoder().encode(JSON.stringify(payload)).length;
+            if (payloadSize > 2048) throw new Error("El paquete de alerta supera el límite de 2 KB.");
+            await window.coalertaData.waitForReady();
+            const submitted = await window.coalertaData.createAlert(payload);
+            const submittedAlert = {
+                ...payload,
+                id: submitted.incidentId,
+                estado: "Recibido en servidor",
+                prioridad: normalizedCategory === "sospecha" ? "Media" : "Alta",
+                reportes: 1,
+                timestamp: new Date().toISOString(),
+                uid: window.coalertaData.getProfile().uid,
+                esReporteReciente: true
+            };
+            window.dispatchEvent(new CustomEvent("coalerta:alerta-reportada", {
+                detail: { alerta: submittedAlert }
+            }));
+            showFeedback("Alerta recibida por la central", "success", "fa-solid fa-circle-check");
+            if (gpsConsent) gpsConsent.checked = false;
+            if (detailInput) detailInput.value = "";
+            if (detailCounter) detailCounter.textContent = "0";
+            if (detailInput) detailInput.disabled = false;
+            if (countdown) countdown.hidden = true;
+            if (grid) grid.hidden = true;
+        } catch (error) {
+            console.error("No se pudo enviar la alerta al servidor:", error);
+            if (detailInput) detailInput.disabled = false;
+            showFailure(getUserFacingError(
+                error,
+                error.message || "No se pudo transmitir la alerta. Verifica tu conexión e inténtalo de nuevo."
+            ));
+        }
     }
 
     function renderAlerts() {
@@ -242,6 +294,14 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         const alerts = window.coalertaData.getAlerts();
         const allOwnAlerts = window.coalertaData.getMyAlerts();
+        if (recentlySubmittedAlert) {
+            const latestOwnStatus = allOwnAlerts.find((alert) =>
+                String(alert.id || alert.alertaId) === String(recentlySubmittedAlert.id)
+            );
+            if (latestOwnStatus && !isTrackedActiveAlert(latestOwnStatus)) {
+                recentlySubmittedAlert = null;
+            }
+        }
         const mapAlerts = Array.isArray(window.coalertaAlertasMapa)
             ? window.coalertaAlertasMapa
             : null;
@@ -271,7 +331,12 @@ document.addEventListener("DOMContentLoaded", function () {
             alert.tipo === "alerta_abierta" &&
                 ["pendiente", "en_atencion"].includes(alert.estado)
         );
-        renderUserResponse(ownAlerts);
+        const responseAlerts = ownAlerts.slice();
+        if (recentlySubmittedAlert &&
+            !responseAlerts.some((alert) => String(alert.id || alert.alertaId) === String(recentlySubmittedAlert.id))) {
+            responseAlerts.push(recentlySubmittedAlert);
+        }
+        renderUserResponse(responseAlerts);
         const visibleById = new Map(activeAlerts.map((alert) => [String(alert.id), alert]));
         ownedRecent.forEach((alert) => {
             const id = String(alert.id || "");
@@ -323,13 +388,21 @@ document.addEventListener("DOMContentLoaded", function () {
     function createAlertCard(alert, isCurrentUserAlert) {
         const article = document.createElement("article");
         article.className = "alerta-item";
-        article.dataset.tipo = normalizeType(alert.tipo);
+        const categoryLabels = {
+            robo: "Robo",
+            sospecha: "Sospecha",
+            accidente: "Accidente"
+        };
+        const alertType = alert.tipo === "alerta_abierta"
+            ? categoryLabels[alert.categoria] || "Emergencia inmediata"
+            : alert.tipo;
+        article.dataset.tipo = normalizeType(alertType);
         article.dataset.id = String(alert.id);
 
         const icon = document.createElement("div");
-        icon.className = `alerta-item-icono ${typeClass(alert.tipo)}`;
+        icon.className = `alerta-item-icono ${typeClass(alertType)}`;
         const iconElement = document.createElement("i");
-        iconElement.className = `fa-solid ${typeIcon(alert.tipo)}`;
+        iconElement.className = `fa-solid ${typeIcon(alertType)}`;
         iconElement.setAttribute("aria-hidden", "true");
         icon.append(iconElement);
 
@@ -338,9 +411,9 @@ document.addEventListener("DOMContentLoaded", function () {
         const top = document.createElement("div");
         top.className = "alerta-item-top";
         const title = document.createElement("strong");
-        const titleType = alert.tipo === "alerta_abierta" ? "Emergencia inmediata" : alert.tipo;
+        const titleType = alertType;
         title.textContent = `${alert.esReporteReciente || alert.esReportePropio ? "Tu reporte · " : ""}` +
-            `${titleType || "Alerta"}${Number(alert.reportes) > 1 ? ` · ${alert.reportes} reportes` : ""}`;
+            `${Number(alert.reportes) > 1 ? "Incidente Grupal · " : ""}${titleType || "Alerta"}${Number(alert.reportes) > 1 ? ` · ${alert.reportes} reportes` : ""}`;
         const elapsed = document.createElement("span");
         elapsed.className = "alerta-tiempo";
         elapsed.textContent = elapsedTime(alert.timestamp);
@@ -408,45 +481,223 @@ document.addEventListener("DOMContentLoaded", function () {
         const panel = document.getElementById("estadoRespuestaVecino");
         const title = document.getElementById("estadoRespuestaTitulo");
         const detail = document.getElementById("estadoRespuestaDetalle");
-        if (!panel || !title || !detail) return;
-        const latestOwn = ownAlerts
+        if (!panel || !title || !detail) {
+            updateAlertEmissionLock(getLatestActiveOwnAlert(ownAlerts));
+            return;
+        }
+        const latestOwn = ownAlerts.slice()
             .sort((a, b) => new Date(b.ultimaActualizacion || b.timestamp || 0) -
                 new Date(a.ultimaActualizacion || a.timestamp || 0))[0];
-        const latest = latestOwn &&
-            ["Recibido en servidor", "Derivada a Central", "Auxilio en camino", "Agentes en sitio"].includes(latestOwn.estado)
-            ? latestOwn
-            : null;
-        if (!latest || latest.estado === "Recibido en servidor") {
+        const latest = latestOwn && isTrackedActiveAlert(latestOwn) ? latestOwn : null;
+        updateAlertEmissionLock(latest);
+        if (!latest) {
             panel.hidden = true;
+            panel.classList.remove("respuesta-vecino-en-camino");
             lastResponse = "";
             responseRendered = true;
+            configureAssignedPatrolListener(null);
             return;
         }
 
-        title.textContent = latest.estado === "Auxilio en camino"
+        const isEnRoute = ["Auxilio en camino", "Atendiendo"].includes(latest.estado);
+        title.textContent = isEnRoute
             ? "Auxilio en camino"
             : latest.estado === "Agentes en sitio"
-                ? "Agentes de serenazgo en tu ubicación"
+                ? "Agentes de serenazgo en su ubicación"
                 : latest.estado === "Derivada a Central"
-                        ? "Alerta canalizada a la central"
-                        : "Recibido por Central";
-        detail.textContent = latest.estado === "Auxilio en camino"
-            ? `${latest.unidad || "Unidad asignada"} · Tiempo estimado: ${latest.etaMinutos ? `${latest.etaMinutos} min` : "calculándose"}.`
+                    ? "Alerta canalizada a la central"
+                    : "Alerta recibida por la central";
+        panel.classList.toggle("respuesta-vecino-en-camino", isEnRoute);
+        detail.textContent = isEnRoute
+            ? responseDetail(latest)
             : latest.estado === "Agentes en sitio"
                 ? "El agente de la unidad asignada marcó su llegada a la ubicación del incidente."
                 : latest.estado === "Derivada a Central"
                     ? "La alerta fue validada por el coordinador de tu comunidad."
-                    : "La alerta continúa en proceso de atención.";
+                    : "Tu alerta fue guardada y la central puede verla.";
         panel.hidden = false;
+        configureAssignedPatrolListener(latest);
         const responseKey = `${latest.id}:${latest.estado}`;
         if (responseRendered && lastResponse !== responseKey &&
-            ["Auxilio en camino", "Agentes en sitio"].includes(latest.estado) &&
+            ["Auxilio en camino", "Atendiendo", "Agentes en sitio"].includes(latest.estado) &&
             typeof navigator.vibrate === "function") {
             navigator.vibrate([180, 90, 180]);
+        }
+        if (responseRendered && lastResponse !== responseKey && isEnRoute) {
+            playArrivalTone();
         }
 
         lastResponse = responseKey;
         responseRendered = true;
+    }
+
+    function isTrackedActiveAlert(alert) {
+        return Boolean(alert && (
+            window.coalertaData.isActive(alert) ||
+            alert.tipo === "alerta_abierta" &&
+                ["pendiente", "en_atencion"].includes(alert.estado)
+        ));
+    }
+
+    function getLatestActiveOwnAlert(alerts) {
+        const ownAlerts = Array.isArray(alerts)
+            ? alerts
+            : window.coalertaData && window.coalertaData.getMyAlerts() || [];
+        return ownAlerts
+            .filter(isTrackedActiveAlert)
+            .sort((a, b) => new Date(b.ultimaActualizacion || b.timestamp || 0) -
+                new Date(a.ultimaActualizacion || a.timestamp || 0))[0] || null;
+    }
+
+    function updateAlertEmissionLock(activeAlert) {
+        const locked = Boolean(activeAlert);
+        document.querySelectorAll(".modal-alerta-btn").forEach((button) => {
+            button.disabled = locked;
+            button.setAttribute("aria-disabled", String(locked));
+        });
+        ["btnEmergencia", "btnEmergenciaMobile"].forEach((id) => {
+            const button = document.getElementById(id);
+            if (!button) return;
+            button.disabled = locked;
+            button.setAttribute("aria-disabled", String(locked));
+            button.title = locked
+                ? "Ya tienes una alerta activa. Podrás reportar otra cuando se cierre."
+                : "Reportar emergencia";
+        });
+        if (locked && activeTimer) {
+            window.clearInterval(activeTimer);
+            activeTimer = null;
+            if (countdown) countdown.hidden = true;
+            if (detailInput) detailInput.disabled = false;
+        }
+    }
+
+    function configureAssignedPatrolListener(alert) {
+        const shouldTrackPatrol = alert &&
+            ["Auxilio en camino", "Atendiendo"].includes(alert.estado) &&
+            alert.patrullaId;
+        const nextPatrolId = shouldTrackPatrol ? String(alert.patrullaId) : "";
+        if (nextPatrolId === assignedPatrolId) {
+            if (nextPatrolId) updateResponseEta();
+            return;
+        }
+        stopAssignedPatrolTracking();
+        assignedPatrolId = nextPatrolId;
+        if (!assignedPatrolId || !window.coalertaData.watchAssignedPatrolLocation) return;
+        assignedPatrolUnsubscribe = window.coalertaData.watchAssignedPatrolLocation(
+            assignedPatrolId,
+            (patrol) => {
+                assignedPatrol = patrol;
+                updateResponseEta();
+            }
+        );
+        responseEtaTimer = window.setInterval(updateResponseEta, 10000);
+    }
+
+    function stopAssignedPatrolTracking() {
+        if (assignedPatrolUnsubscribe) assignedPatrolUnsubscribe();
+        assignedPatrolUnsubscribe = null;
+        assignedPatrolId = "";
+        assignedPatrol = null;
+        if (responseEtaTimer !== null) {
+            window.clearInterval(responseEtaTimer);
+            responseEtaTimer = null;
+        }
+    }
+
+    function responseDetail(alert) {
+        const unitCode = alert.unidad || alert.patrullaId || "Unidad asignada";
+        const distance = getResponseDistance(alert);
+        const eta = Number.isFinite(distance)
+            ? distance === 0 ? 0 : Math.max(1, Math.ceil(distance / (40000 / 60)))
+            : null;
+        const distanceText = Number.isFinite(distance)
+            ? `Distancia: ${Math.round(distance)} m`
+            : "Distancia: calculándose";
+        const etaText = eta === null ? "Tiempo estimado: calculándose" : `Tiempo estimado: ${eta} min`;
+        return `Unidad de seguridad: ${unitCode} · ${distanceText} · ${etaText}`;
+    }
+
+    function getResponseDistance(alert) {
+        if (!assignedPatrol || assignedPatrol.latitud == null || assignedPatrol.longitud == null ||
+            alert.latitud == null || alert.longitud == null ||
+            !Number.isFinite(Number(assignedPatrol.latitud)) ||
+            !Number.isFinite(Number(assignedPatrol.longitud)) ||
+            !Number.isFinite(Number(alert.latitud)) || !Number.isFinite(Number(alert.longitud))) {
+            return NaN;
+        }
+        return window.coalertaData.distanceMeters(
+            { latitud: Number(assignedPatrol.latitud), longitud: Number(assignedPatrol.longitud) },
+            { latitud: Number(alert.latitud), longitud: Number(alert.longitud) }
+        );
+    }
+
+    function updateResponseEta() {
+        const panel = document.getElementById("estadoRespuestaVecino");
+        const detail = document.getElementById("estadoRespuestaDetalle");
+        if (!panel || panel.hidden || !detail || !window.coalertaData) return;
+        const latest = getLatestActiveOwnAlert();
+        if (!latest || !["Auxilio en camino", "Atendiendo"].includes(latest.estado)) return;
+        detail.textContent = responseDetail(latest);
+    }
+
+    function playArrivalTone() {
+        const sound = window.coalertaSonidoEmergencia;
+        if (sound && typeof sound.play === "function") {
+            Promise.resolve().then(() => sound.play()).catch((error) => {
+                console.info("El navegador no permitió reproducir el tono de llegada:", error);
+            });
+            return;
+        }
+        if (typeof Audio !== "function" || typeof URL.createObjectURL !== "function") return;
+        const audio = new Audio(
+            "data:audio/wav;base64,UklGRqQCAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YYACAADAwMDAwEBAQEBAwMDAwEBAQEBAwMDAwEBAQEBAwMDAwEBAQEBAwMDAwEBAQEBAwMDAwEBAQEBAwMDAwMBAQEBAwMDAwMBAQEBAwMDAwMBAQEBAwMDAwMBAQEBAwMDAwMBAQEBAwMDAwMBAQEBAQMDAwMBAQEBAQMDAwMBAQEBAQMDAwMBAQEBAQMDAwMBAQEBAQMDAwMBAQEBAQMDAwMDAQEBAQMDAwMDAQEBAQMDAwMDAQEBAQMDAwMDAQEBAQMDAwMDAQEBAQMDAwMDAQEBAQEDAwMDAQEBAQEDAwMDAQEBAQEDAwMDAQEBAQEDAwMDAQEBAQEDAwMDAQEBAQEDAwMDAwEBAQEDAwMDAwEBAQEDAwMDAwEBAQEDAwMDAwEBAQEDAwMDAwEBAQEBAwMDAwEBAQEBAwMDAwEBAQEBAwMDAwEBAQEBAwMDAwEBAQEBAwMDAwEBA"
+        );
+        const sampleRate = 8000;
+        const sampleCount = sampleRate / 5;
+        const wav = new Uint8Array(44 + sampleCount);
+        const header = new DataView(wav.buffer);
+        const writeText = (offset, value) => {
+            for (let index = 0; index < value.length; index += 1) {
+                wav[offset + index] = value.charCodeAt(index);
+            }
+        };
+        writeText(0, "RIFF");
+        header.setUint32(4, 36 + sampleCount, true);
+        writeText(8, "WAVEfmt ");
+        header.setUint32(16, 16, true);
+        header.setUint16(20, 1, true);
+        header.setUint16(22, 1, true);
+        header.setUint32(24, sampleRate, true);
+        header.setUint32(28, sampleRate, true);
+        header.setUint16(32, 1, true);
+        header.setUint16(34, 8, true);
+        writeText(36, "data");
+        header.setUint32(40, sampleCount, true);
+        for (let index = 0; index < sampleCount; index += 1) {
+            wav[44 + index] = Math.sin(2 * Math.PI * 880 * index / sampleRate) >= 0 ? 208 : 48;
+        }
+        const audioUrl = URL.createObjectURL(new Blob([wav], { type: "audio/wav" }));
+        audio.src = audioUrl;
+        const releaseAudioUrl = () => URL.revokeObjectURL(audioUrl);
+        audio.addEventListener("ended", releaseAudioUrl, { once: true });
+        audio.addEventListener("error", releaseAudioUrl, { once: true });
+        audio.play().catch((error) => {
+            releaseAudioUrl();
+            console.info("El navegador no permitió reproducir el tono de llegada:", error);
+        });
+    }
+
+    function unlockEmergencyAudio() {
+        const sound = window.coalertaSonidoEmergencia;
+        if (!sound || typeof sound.unlock !== "function") return;
+        try {
+            Promise.resolve(sound.unlock()).catch((error) => {
+                console.info("No se pudo habilitar el audio de emergencia:", error);
+            });
+        } catch (error) {
+            console.info("No se pudo habilitar el audio de emergencia:", error);
+        }
     }
 
     function createEvaluation(alert) {
@@ -523,17 +774,29 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function showFailure(message) {
+        if (detailInput) detailInput.disabled = false;
         if (countdown) countdown.hidden = true;
         if (grid) grid.hidden = false;
         showFeedback(message, "error");
     }
 
-    function showFeedback(message, type) {
+    function esEntornoLocal() {
+        return ["localhost", "127.0.0.1"].includes(window.location.hostname);
+    }
+
+    function showFeedback(message, type, iconClass = "") {
         if (!feedback) {
             window.alert(message);
             return;
         }
-        feedback.textContent = message;
+        feedback.replaceChildren();
+        if (iconClass) {
+            const icon = document.createElement("i");
+            icon.className = iconClass;
+            icon.setAttribute("aria-hidden", "true");
+            feedback.append(icon, document.createTextNode(" "));
+        }
+        feedback.append(document.createTextNode(message));
         feedback.className = `estado-envio-alerta estado-envio-${type}`;
         feedback.hidden = false;
     }
@@ -549,8 +812,11 @@ document.addEventListener("DOMContentLoaded", function () {
         if (error && (error.code === "permission-denied" || error.code === "unauthenticated")) {
             return "No tienes permiso para completar esta acción.";
         }
+        if (error && error.code === "resource-exhausted") {
+            return "El servicio está temporalmente saturado. Inténtalo más tarde.";
+        }
         if (error && (error.code === "unavailable" || error.code === "network-request-failed")) {
-            return "No se pudo conectar con el servicio. Verifica tu conexión e inténtalo de nuevo.";
+            return "Error de conexión. Inténtalo de nuevo.";
         }
         return fallback;
     }

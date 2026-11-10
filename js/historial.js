@@ -1,9 +1,14 @@
 import { signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { auth } from "./firebase-config.js?v=spark-direct-firestore-1";
+import {
+    collection, doc, getDoc, onSnapshot, orderBy, query, Timestamp, where
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
+import {
+    configurarCierreSesion,
+    establecerTexto,
+    formatearRolVisible
+} from "./general.js?v=shared-core-20261106";
 
-/* =========================================================
-   COALERTA - HISTORIAL.JS
-========================================================= */
 document.addEventListener("DOMContentLoaded", function () {
     const tablaHistorial = document.getElementById("tablaHistorial");
     const sinResultados = document.getElementById("sinResultados");
@@ -11,6 +16,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const filtroTipo = document.getElementById("filtroTipo");
     const filtroEstado = document.getElementById("filtroEstado");
     const filtroFecha = document.getElementById("filtroFecha");
+    const filtroFechaFin = document.getElementById("filtroFechaFin");
     const cantidadResultados = document.getElementById("cantidadResultados");
     const modalDetalle = document.getElementById("modalDetalle");
 
@@ -20,10 +26,28 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     configurarUsuario();
-    configurarCierreSesion();
+    configurarCierreSesion({
+        auth,
+        signOut,
+        confirmationMessage: "¿Seguro que deseas cerrar sesión?",
+        clearCachedSession: true
+    });
     configurarModal(modalDetalle);
+    if (filtroBusqueda) {
+        filtroBusqueda.addEventListener("keydown", (event) => {
+            if (event.key !== "Enter") return;
+            event.preventDefault();
+            void buscarAlertaPorCodigo(filtroBusqueda.value);
+        });
+    }
 
     let filas = [];
+    let alertaBuscada = null;
+    let incidentesComunidad = [];
+    let consultaComunidadActual = "";
+    let secuenciaConsultaComunidad = 0;
+    let cancelarConsultaComunidad = null;
+    let errorConsultaComunidad = null;
     configurarFiltros(() => filas);
     configurarExportacion(() => filas);
     window.addEventListener("coalerta:datos-listos", function (event) {
@@ -34,12 +58,30 @@ document.addEventListener("DOMContentLoaded", function () {
     window.addEventListener("coalerta:alertas-actualizadas", renderHistorial);
     window.addEventListener("coalerta:sesion-cambiada", function (event) {
         configurarUsuario(event.detail && event.detail.profile || {});
+        secuenciaConsultaComunidad += 1;
+        if (cancelarConsultaComunidad) cancelarConsultaComunidad();
+        cancelarConsultaComunidad = null;
+        consultaComunidadActual = "";
+        incidentesComunidad = [];
+        errorConsultaComunidad = null;
         renderHistorial();
     });
     window.addEventListener("coalerta:error", function (event) {
         const detail = event.detail || {};
-        if (!["perfil", "tus alertas"].includes(detail.area)) return;
+        if (!["perfil", "tus alertas", "incidentes historial"].includes(detail.area)) return;
         console.error("No se pudieron sincronizar los datos del historial:", detail.message || detail);
+        if (detail.area === "incidentes historial") {
+            errorConsultaComunidad = detail.message || "No se pudieron cargar cierres del sector.";
+            actualizarEstadoHistorial("error");
+            const operation = document.getElementById("estadoOperacionHistorial");
+            const operationDetail = document.getElementById("detalleOperacionHistorial");
+            if (operation) operation.textContent = "No se pudieron cargar cierres del sector";
+            if (operationDetail) {
+                operationDetail.textContent =
+                    "Comprueba que tu rol tenga acceso a los incidentes de la comunidad e inténtalo nuevamente.";
+            }
+            return;
+        }
         filas = [];
         tablaHistorial.replaceChildren();
         actualizarEstadisticas(filas);
@@ -54,6 +96,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
     function renderHistorial() {
         if (!window.coalertaData || !window.coalertaData.isReady()) {
+            secuenciaConsultaComunidad += 1;
+            if (cancelarConsultaComunidad) cancelarConsultaComunidad();
+            cancelarConsultaComunidad = null;
+            consultaComunidadActual = "";
+            incidentesComunidad = [];
+            errorConsultaComunidad = null;
             actualizarEstadoHistorial(
                 window.coalertaData && window.coalertaData.getProfile() ? "connecting" : "disconnected"
             );
@@ -77,13 +125,123 @@ document.addEventListener("DOMContentLoaded", function () {
             return;
         }
         actualizarEstadoHistorial("connected");
-        filas = window.coalertaData.getMyAlerts()
+        cargarIncidentesComunidad();
+        const alertasRegistro = new Map(
+            incidentesComunidad.map((alerta) => [String(alerta.id), alerta])
+        );
+        window.coalertaData.getMyAlerts()
+            .forEach((alerta) => alertasRegistro.set(String(alerta.id), {
+                ...alertasRegistro.get(String(alerta.id)),
+                ...alerta
+            }));
+        if (alertaBuscada) {
+            alertasRegistro.set(String(alertaBuscada.id), {
+                ...alertasRegistro.get(String(alertaBuscada.id)),
+                ...alertaBuscada
+            });
+        }
+        filas = Array.from(alertasRegistro.values())
             .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0))
             .map((alerta) => crearFilaAlerta(alerta));
         tablaHistorial.replaceChildren(...filas.map((fila) => fila.elemento));
         actualizarEstadisticas(filas);
         mostrarEstadoHistorial("No encontramos alertas", "Prueba cambiando los filtros de búsqueda.");
         filtrarHistorial(filas);
+        if (errorConsultaComunidad) {
+            actualizarEstadoHistorial("error");
+            const operation = document.getElementById("estadoOperacionHistorial");
+            const operationDetail = document.getElementById("detalleOperacionHistorial");
+            if (operation) operation.textContent = "No se pudieron cargar cierres del sector";
+            if (operationDetail) {
+                operationDetail.textContent =
+                    "Comprueba que tu rol tenga acceso a los incidentes de la comunidad e inténtalo nuevamente.";
+            }
+        }
+    }
+
+    function cargarIncidentesComunidad() {
+        const data = window.coalertaData;
+        const profile = data.getProfile() || {};
+        const communityId = String(profile.comunidadId || "").trim();
+        if (!communityId) {
+            secuenciaConsultaComunidad += 1;
+            if (cancelarConsultaComunidad) cancelarConsultaComunidad();
+            cancelarConsultaComunidad = null;
+            incidentesComunidad = [];
+            errorConsultaComunidad = null;
+            consultaComunidadActual = `${auth.currentUser && auth.currentUser.uid || ""}:${communityId}:${role}:sin-acceso`;
+            return;
+        }
+
+        const fechaInicio = filtroFecha ? filtroFecha.value : "";
+        const fechaFin = filtroFechaFin ? filtroFechaFin.value : "";
+        if (fechaInicio && fechaFin && fechaInicio > fechaFin) {
+            secuenciaConsultaComunidad += 1;
+            if (cancelarConsultaComunidad) cancelarConsultaComunidad();
+            cancelarConsultaComunidad = null;
+            incidentesComunidad = [];
+            errorConsultaComunidad = null;
+            consultaComunidadActual = `${auth.currentUser && auth.currentUser.uid || ""}:${communityId}:rango-invalido`;
+            establecerEstadoRangoInvalido();
+            return;
+        }
+
+        const signature = [
+            auth.currentUser && auth.currentUser.uid || "",
+            communityId,
+            fechaInicio,
+            fechaFin
+        ].join(":");
+        if (signature === consultaComunidadActual) return;
+        consultaComunidadActual = signature;
+        if (cancelarConsultaComunidad) cancelarConsultaComunidad();
+        cancelarConsultaComunidad = null;
+        incidentesComunidad = [];
+        errorConsultaComunidad = null;
+        const sequence = ++secuenciaConsultaComunidad;
+        const constraints = [where("comunidadId", "==", communityId)];
+        if (fechaInicio) {
+            constraints.push(where("timestamp", ">=", Timestamp.fromDate(fechaLocal(fechaInicio))));
+        }
+        if (fechaFin) {
+            const fechaFinExclusiva = fechaLocal(fechaFin);
+            fechaFinExclusiva.setDate(fechaFinExclusiva.getDate() + 1);
+            constraints.push(where("timestamp", "<", Timestamp.fromDate(fechaFinExclusiva)));
+        }
+        constraints.push(orderBy("timestamp", "desc"));
+        const queryCommunity = query(collection(db, "incidentes"), ...constraints);
+
+        cancelarConsultaComunidad = onSnapshot(queryCommunity, (snapshot) => {
+            if (sequence !== secuenciaConsultaComunidad) return;
+            incidentesComunidad = snapshot.docs
+                .map((document) => {
+                    const incidente = document.data();
+                    return {
+                        ...incidente,
+                        id: document.id,
+                        timestamp: fechaAISO(incidente.timestamp),
+                        enSitioAt: fechaAISO(incidente.enSitioAt),
+                        closedAt: fechaAISO(incidente.closedAt)
+                    };
+                });
+            renderHistorial();
+        }, (error) => {
+            if (sequence !== secuenciaConsultaComunidad) return;
+            console.error("No se pudieron consultar los cierres de la comunidad:", error);
+            window.dispatchEvent(new CustomEvent("coalerta:error", {
+                detail: {
+                    area: "incidentes historial",
+                    message: error.message || "No se pudieron consultar los cierres de la comunidad."
+                }
+            }));
+        });
+    }
+
+    function establecerEstadoRangoInvalido() {
+        const operation = document.getElementById("estadoOperacionHistorial");
+        const operationDetail = document.getElementById("detalleOperacionHistorial");
+        if (operation) operation.textContent = "Rango de fechas no válido";
+        if (operationDetail) operationDetail.textContent = "La fecha de inicio debe ser anterior o igual a la fecha de fin.";
     }
 
     function mostrarEstadoHistorial(titulo, mensaje) {
@@ -121,11 +279,21 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function configurarFiltros(obtenerFilas) {
-        [filtroBusqueda, filtroTipo, filtroEstado, filtroFecha].forEach((control) => {
+        [filtroBusqueda, filtroTipo, filtroEstado, filtroFecha, filtroFechaFin].forEach((control) => {
             if (!control) return;
             control.addEventListener(
                 control === filtroBusqueda ? "input" : "change",
-                () => filtrarHistorial(obtenerFilas())
+                () => {
+                    if (control === filtroFecha || control === filtroFechaFin) {
+                        consultaComunidadActual = "";
+                        renderHistorial();
+                    } else if (control === filtroBusqueda) {
+                        alertaBuscada = null;
+                        renderHistorial();
+                    } else {
+                        filtrarHistorial(obtenerFilas());
+                    }
+                }
             );
         });
 
@@ -136,7 +304,10 @@ document.addEventListener("DOMContentLoaded", function () {
                 if (filtroTipo) filtroTipo.value = "todos";
                 if (filtroEstado) filtroEstado.value = "todos";
                 if (filtroFecha) filtroFecha.value = "";
-                filtrarHistorial(obtenerFilas());
+                if (filtroFechaFin) filtroFechaFin.value = "";
+                alertaBuscada = null;
+                consultaComunidadActual = "";
+                renderHistorial();
             });
         }
     }
@@ -145,15 +316,19 @@ document.addEventListener("DOMContentLoaded", function () {
         const texto = normalizarTexto(filtroBusqueda ? filtroBusqueda.value : "");
         const tipo = filtroTipo ? filtroTipo.value : "todos";
         const estado = filtroEstado ? filtroEstado.value : "todos";
-        const fecha = filtroFecha ? filtroFecha.value : "";
+        const fechaInicio = filtroFecha ? filtroFecha.value : "";
+        const fechaFin = filtroFechaFin ? filtroFechaFin.value : "";
         let visibles = 0;
 
         alertasFilas.forEach(({ elemento, datos }) => {
-            const coincideTexto = normalizarTexto(elemento.textContent).includes(texto);
+            const coincideTexto = normalizarTexto(elemento.textContent).includes(texto) ||
+                normalizarTexto(datos.alerta && datos.alerta.id).includes(texto);
             const coincideTipo = tipo === "todos" || datos.tipoClase === tipo;
             const coincideEstado = estado === "todos" || datos.estadoClase === estado;
-            const coincideFecha = !fecha || datos.fechaISO === fecha;
-            const mostrar = coincideTexto && coincideTipo && coincideEstado && coincideFecha;
+            const coincideFechaInicio = !fechaInicio || datos.fechaISO >= fechaInicio;
+            const coincideFechaFin = !fechaFin || datos.fechaISO <= fechaFin;
+            const mostrar = coincideTexto && coincideTipo && coincideEstado &&
+                coincideFechaInicio && coincideFechaFin;
 
             elemento.hidden = !mostrar;
             if (mostrar) visibles++;
@@ -161,6 +336,38 @@ document.addEventListener("DOMContentLoaded", function () {
 
         cantidadResultados.textContent = `${visibles} ${visibles === 1 ? "resultado" : "resultados"}`;
         sinResultados.classList.toggle("mostrar", visibles === 0);
+    }
+
+    async function buscarAlertaPorCodigo(codigo) {
+        const id = String(codigo || "").trim();
+        if (!id) return;
+
+        try {
+            const snapshot = await getDoc(doc(db, "incidentes", id));
+            if (!snapshot.exists()) {
+                alertaBuscada = null;
+                renderHistorial();
+                window.alert("No se encontró una alerta con ese código.");
+                return;
+            }
+
+            if (filtroTipo) filtroTipo.value = "todos";
+            if (filtroEstado) filtroEstado.value = "todos";
+            if (filtroFecha) filtroFecha.value = "";
+            if (filtroFechaFin) filtroFechaFin.value = "";
+            alertaBuscada = { ...snapshot.data(), id: snapshot.id };
+            renderHistorial();
+            const filaBuscada = filas.find((fila) => String(fila.datos.alerta.id) === id);
+            if (filaBuscada && !filaBuscada.elemento.hidden) {
+                filaBuscada.elemento.scrollIntoView({ behavior: "smooth", block: "center" });
+                filaBuscada.elemento.classList.add("fila-alerta-buscada");
+            }
+        } catch (error) {
+            console.error("No se pudo buscar la alerta por código:", error);
+            window.alert(error.code === "permission-denied"
+                ? "No tienes permiso para consultar esa alerta."
+                : "No se pudo consultar la alerta. Inténtalo nuevamente.");
+        }
     }
 });
 
@@ -221,10 +428,20 @@ function crearFilaAlerta(alerta) {
     const estadoEtiqueta = document.createElement("span");
     estadoEtiqueta.className = `estado-alerta ${estado.clase}`;
     const iconoEstado = document.createElement("i");
-    iconoEstado.className = `fa-solid ${estado.icono}`;
+    const estadoEnProceso = estado.clase === "proceso";
+    iconoEstado.className = `fa-solid ${estadoEnProceso ? "fa-clock" : estado.icono}`;
     iconoEstado.setAttribute("aria-hidden", "true");
-    estadoEtiqueta.append(iconoEstado, document.createTextNode(` ${estado.etiqueta}`));
+    estadoEtiqueta.append(
+        iconoEstado,
+        document.createTextNode(` ${estadoEnProceso ? "En proceso" : estado.etiqueta}`)
+    );
     estadoCelda.appendChild(estadoEtiqueta);
+    const tiempoRespuesta = document.createElement("small");
+    tiempoRespuesta.className = "tiempo-respuesta-historial";
+    tiempoRespuesta.style.display = "block";
+    tiempoRespuesta.style.marginTop = "6px";
+    tiempoRespuesta.textContent = `Tiempo de respuesta: ${formatearTiempoRespuesta(alerta)}`;
+    estadoCelda.appendChild(tiempoRespuesta);
 
     const accionCelda = document.createElement("td");
     const botonDetalle = document.createElement("button");
@@ -258,6 +475,7 @@ function crearFilaAlerta(alerta) {
             estadoClase: estado.clase,
             fechaISO: fecha.iso,
             prioridad: String(alerta.prioridad || ""),
+            tiempoRespuesta: formatearTiempoRespuesta(alerta),
             alerta
         }
     };
@@ -288,6 +506,13 @@ function configurarUsuario(profileOverride) {
     const primerNombre = nombre.trim().split(/\s+/)[0] || "usuario";
     const nombreElemento = document.getElementById("sidebarNombre");
     const rolElemento = document.getElementById("sidebarRol");
+    const botonExportar = document.getElementById("btnExportar");
+    const role = window.coalertaData && window.coalertaData.isReady()
+        ? window.coalertaData.getRole()
+        : String(usuario.rol || "").trim().toLowerCase();
+    if (botonExportar) {
+        botonExportar.hidden = !["coordinador", "seguridad", "agente"].includes(role);
+    }
 
     if (nombreElemento) nombreElemento.textContent = `Hola, ${primerNombre}`;
     if (rolElemento) rolElemento.textContent = formatearRolVisible(usuario);
@@ -307,51 +532,6 @@ function configurarUsuario(profileOverride) {
         avatar.hidden = true;
         if (icono) icono.hidden = false;
     }
-}
-
-function formatearRolVisible(usuario) {
-    const valor = String(usuario.rol || "vecino").trim();
-    const normalizado = valor.toLocaleLowerCase();
-    const roleLabels = {
-        vecino: "Vecino",
-        residente: "Vecino",
-        coordinador: "Coordinador vecinal",
-        seguridad: "Personal de seguridad",
-        agente: "Personal de seguridad"
-    };
-    const rol = roleLabels[normalizado] ||
-        (["vecino / residente", "vecino/residente"].includes(normalizado)
-            ? "Vecino"
-            : valor.charAt(0).toLocaleUpperCase() + valor.slice(1));
-    if (normalizado === "vecino" && usuario.estadoSolicitudRol === "pendiente" && usuario.rolSolicitud) {
-        const solicitado = usuario.rolSolicitud === "coordinador"
-            ? "Coordinador vecinal"
-            : usuario.rolSolicitud === "seguridad" ? "Personal de seguridad" : usuario.rolSolicitud;
-        return `${solicitado} (pendiente)`;
-    }
-    return rol;
-}
-
-function configurarCierreSesion() {
-    const boton = document.getElementById("btnCerrarSesionLateral");
-    if (!boton) return;
-
-    boton.addEventListener("click", async function (evento) {
-        evento.preventDefault();
-        if (!confirm("¿Seguro que deseas cerrar sesión?")) return;
-
-        try {
-            if (typeof auth !== "undefined" && auth.currentUser) {
-                await signOut(auth);
-            }
-            localStorage.removeItem("coalerta_usuario");
-            localStorage.removeItem("coalertaSesion");
-            window.location.href = "login.html";
-        } catch (error) {
-            console.error("No se pudo cerrar la sesión:", error);
-            alert("No se pudo cerrar la sesión. Inténtalo nuevamente.");
-        }
-    });
 }
 
 function configurarModal(modal) {
@@ -379,7 +559,13 @@ function mostrarDetalle(alerta, tipoClase, fecha, estado) {
     establecerTexto("detalleFecha", fecha.formateada);
     establecerTexto("detalleHora", obtenerHoraAlerta(alerta));
     establecerTexto("detalleEstado", estado.etiqueta);
+    establecerTexto(
+        "detallePatrulla",
+        alerta.unidad || alerta.codigoPatrulla || alerta.patrullaId || "No asignada"
+    );
+    establecerTexto("detalleTiempoRespuesta", formatearTiempoRespuesta(alerta));
     establecerTexto("detalleReporteTexto", String(alerta.detalle || "").trim() || "Sin detalle adicional.");
+    renderizarLineaTiempo(alerta);
 
     const iconoTipo = document.querySelector(".detalle-alerta-icono");
     if (iconoTipo) {
@@ -430,11 +616,45 @@ function mostrarDetalle(alerta, tipoClase, fecha, estado) {
     }
 }
 
+function renderizarLineaTiempo(alerta) {
+    const lista = document.getElementById("lineaTiempoIncidente");
+    if (!lista) return;
+
+    const etapas = [
+        ["Emisión", alerta.timestamp],
+        ["Derivación", alerta.derivadaAt],
+        ["Aceptación", alerta.despachoAt],
+        ["Arribo", alerta.enSitioAt],
+        ["Cierre", alerta.closedAt]
+    ];
+
+    lista.replaceChildren(...etapas.map(([nombre, valor]) => {
+        const elemento = document.createElement("li");
+        const titulo = document.createElement("strong");
+        const hora = document.createElement("time");
+        const fecha = convertirFecha(valor);
+
+        titulo.textContent = nombre;
+        if (fecha && Number.isFinite(fecha.getTime())) {
+            hora.dateTime = fecha.toISOString();
+            hora.textContent = fecha.toLocaleString("es-PE");
+        } else {
+            hora.textContent = "No registrada";
+        }
+
+        elemento.append(titulo, hora);
+        return elemento;
+    }));
+}
+
 function configurarExportacion(obtenerFilas) {
     const boton = document.getElementById("btnExportar");
     if (!boton) return;
 
     boton.addEventListener("click", function () {
+        const role = window.coalertaData && window.coalertaData.getRole();
+        if (!["coordinador", "seguridad", "agente"].includes(role)) return;
+
         const filas = obtenerFilas();
         const visibles = filas.filter(({ elemento }) => !elemento.hidden);
         if (visibles.length === 0) {
@@ -442,7 +662,10 @@ function configurarExportacion(obtenerFilas) {
             return;
         }
 
-        const cabecera = ["ID", "Tipo", "Ubicación", "Fecha", "Hora", "Estado", "Latitud", "Longitud", "Prioridad"];
+        const cabecera = [
+            "ID", "Tipo", "Ubicación", "Fecha", "Hora", "Estado",
+            "Tiempo de respuesta", "Latitud", "Longitud", "Prioridad"
+        ];
         const filasCsv = visibles.map(({ elemento, datos }, index) => {
             const alerta = datos.alerta;
             return [
@@ -452,6 +675,7 @@ function configurarExportacion(obtenerFilas) {
                 elemento.cells[2].textContent.trim(),
                 elemento.cells[3].textContent.trim(),
                 elemento.cells[4].textContent.trim(),
+                datos.tiempoRespuesta,
                 alerta && alerta.latitud != null ? alerta.latitud : "",
                 alerta && alerta.longitud != null ? alerta.longitud : "",
                 datos.prioridad
@@ -471,6 +695,32 @@ function configurarExportacion(obtenerFilas) {
         enlace.remove();
         URL.revokeObjectURL(url);
     });
+}
+
+function formatearTiempoRespuesta(alerta) {
+    const emision = convertirFecha(alerta && alerta.timestamp) ||
+        convertirFecha(alerta && alerta.fecha) ||
+        convertirFecha(alerta && alerta.createdAt);
+    const arribo = convertirFecha(alerta && alerta.enSitioAt);
+    if (!emision || !arribo || arribo < emision) return "No disponible";
+
+    const totalSegundos = Math.floor((arribo.getTime() - emision.getTime()) / 1000);
+    const horas = Math.floor(totalSegundos / 3600);
+    const minutos = Math.floor((totalSegundos % 3600) / 60);
+    const segundos = totalSegundos % 60;
+    if (horas > 0) return `${horas} h ${minutos} min ${segundos} s`;
+    if (minutos > 0) return `${minutos} min ${segundos} s`;
+    return `${segundos} s`;
+}
+
+function fechaLocal(value) {
+    const [year, month, day] = value.split("-").map(Number);
+    return new Date(year, month - 1, day);
+}
+
+function fechaAISO(value) {
+    const fecha = convertirFecha(value);
+    return fecha ? fecha.toISOString() : null;
 }
 
 function obtenerFechaAlerta(alerta) {
@@ -590,9 +840,4 @@ function normalizarTexto(valor) {
 
 function escaparCampoCsv(valor) {
     return `"${String(valor == null ? "" : valor).replace(/"/g, '""')}"`;
-}
-
-function establecerTexto(id, valor) {
-    const elemento = document.getElementById(id);
-    if (elemento) elemento.textContent = String(valor);
 }

@@ -1,55 +1,47 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Historial de alertas | CoAlerta</title>
-
-    <!-- Fuente -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- Iconos -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <link rel="icon" type="image/svg+xml" href="../assets/svg/logo.svg?v=2">
     <script>
         (function () {
-        try {
-            const profile = JSON.parse(localStorage.getItem("coalerta_usuario") || "null");
-            const cachedRole = JSON.parse(localStorage.getItem("userRole") || "null");
-            if (localStorage.getItem("coalertaSesion") === "activa" &&
-                profile && cachedRole && profile.uid === cachedRole.uid &&
-                String(profile.rol || "").trim().toLowerCase() === cachedRole.role) {
-                if (cachedRole.isAdmin === true) document.documentElement.classList.add("role-admin");
-                if (cachedRole.isAdmin === true ||
-                    ["coordinador", "administrador", "admin"].includes(cachedRole.role)) {
-                    document.documentElement.classList.add("role-coordinator");
+            try {
+                const profile = JSON.parse(localStorage.getItem("coalerta_usuario") || "null");
+                const cachedRole = JSON.parse(localStorage.getItem("userRole") || "null");
+                if (localStorage.getItem("coalertaSesion") === "activa" &&
+                    profile && cachedRole && profile.uid === cachedRole.uid &&
+                    String(profile.rol || "").trim().toLowerCase() === cachedRole.role) {
+                    if (cachedRole.isAdmin === true) document.documentElement.classList.add("role-admin");
+                    if (cachedRole.isAdmin === true ||
+                        ["coordinador", "administrador", "admin"].includes(cachedRole.role)) {
+                        document.documentElement.classList.add("role-coordinator");
+                    }
+                    if (cachedRole.isAdmin === true ||
+                        ["agente", "seguridad", "administrador", "admin"].includes(cachedRole.role)) {
+                        document.documentElement.classList.add("role-security");
+                    }
                 }
-                if (cachedRole.isAdmin === true ||
-                    ["agente", "seguridad", "administrador", "admin"].includes(cachedRole.role)) {
-                    document.documentElement.classList.add("role-security");
-                }
+            } catch (error) {
+                console.warn("No se pudo recuperar el rol guardado para el menú:", error);
             }
-        } catch (error) {
-            console.warn("No se pudo recuperar el rol guardado para el menú:", error);
-        }
         })();
     </script>
-    <!-- CSS -->
     <link rel="stylesheet" href="../css/estilos.css?v=mobile-nav-fixed-20261102">
     <link rel="stylesheet" href="../css/responsive.css">
-    <link rel="stylesheet" href="../css/historial.css?v=ordered-panels-gps-dispatch-20261029">
+    <link rel="stylesheet" href="../css/historial.css?v=hide-export-for-neighbors-20261109">
     <script src="../js/tema.js?v=20261029-theme-scroll"></script>
 </head>
 
 <body class="pagina-historial" data-role-navigation-ready="false">
-
-    <!-- ===================================
-         HEADER
-    ==================================== -->
     <header class="mapa-header">
         <div class="mapa-header-contenido">
-            <!-- LOGO -->
             <a href="../index.html" class="logo" aria-label="Co Alerta, inicio">
                 <div class="logo-icono">
                     <i class="fa-solid fa-shield-halved"></i>
@@ -59,7 +51,6 @@
                 </div>
             </a>
 
-            <!-- CENTRO -->
             <div class="mapa-header-centro">
                 <div class="estado-sistema">
                     <span class="estado-punto"></span>
@@ -67,9 +58,9 @@
                 </div>
             </div>
 
-            <!-- DERECHA -->
             <div class="mapa-header-derecha">
-                <button class="boton-header" type="button" title="Notificaciones" id="btnNotificaciones" aria-label="Notificaciones" aria-expanded="false" aria-controls="menuNotificaciones">
+                <button class="boton-header" type="button" title="Notificaciones" id="btnNotificaciones"
+                    aria-label="Notificaciones" aria-expanded="false" aria-controls="menuNotificaciones">
                     <i class="fa-solid fa-bell"></i>
                     <span class="notificacion-contador" hidden></span>
                 </button>
@@ -89,17 +80,8 @@
         </div>
     </header>
 
-    <!-- ===================================
-         CONTENEDOR PRINCIPAL
-    ==================================== -->
     <main class="mapa-layout">
-
-        <!-- ===================================
-             SIDEBAR
-        ==================================== -->
         <aside class="mapa-sidebar">
-
-            <!-- USUARIO -->
             <div class="sidebar-usuario">
                 <div class="usuario-avatar" id="sidebarAvatarContainer">
                     <i class="fa-solid fa-user" id="sidebarAvatarIcon"></i>
@@ -111,7 +93,6 @@
                 </div>
             </div>
 
-            <!-- MENÚ -->
             <nav class="sidebar-menu">
                 <a href="mapa.html">
                     <i class="fa-solid fa-map-location-dot"></i>
@@ -143,7 +124,6 @@
                 </a>
             </nav>
 
-            <!-- ESTADO -->
             <div class="sidebar-estado">
                 <div class="sidebar-estado-icono">
                     <i class="fa-solid fa-shield-halved"></i>
@@ -154,33 +134,26 @@
                 </div>
             </div>
 
-            <!-- CERRAR SESIÓN -->
             <a href="login.html" class="cerrar-sesion" id="btnCerrarSesionLateral">
                 <i class="fa-solid fa-right-from-bracket"></i>
                 Cerrar sesión
             </a>
         </aside>
 
-        <!-- ===================================
-             CONTENIDO
-        ==================================== -->
         <section class="historial-contenido">
-
-            <!-- CABECERA -->
             <div class="historial-superior">
                 <div>
                     <h1>Historial<span class="historial-titulo-resto"> de alertas</span></h1>
                     <p>Consulta y revisa tus reportes de emergencia.</p>
                 </div>
-                <button class="btn-exportar" id="btnExportar" type="button" aria-label="Exportar historial" title="Exportar historial">
+                <button class="btn-exportar" id="btnExportar" type="button" aria-label="Exportar historial"
+                    hidden
+                    title="Exportar historial">
                     <i class="fa-solid fa-file-arrow-down"></i>
                     Exportar
                 </button>
             </div>
 
-            <!-- ===================================
-                 ESTADÍSTICAS
-            ==================================== -->
             <div class="historial-estadisticas">
                 <div class="estadistica-card">
                     <div class="estadistica-icono azul">
@@ -223,15 +196,13 @@
                 </div>
             </div>
 
-            <!-- ===================================
-                 FILTROS
-            ==================================== -->
             <section class="historial-filtros">
                 <div class="filtro-grupo">
                     <label for="buscarAlerta">Buscar</label>
                     <div class="input-busqueda">
                         <i class="fa-solid fa-magnifying-glass"></i>
-                        <input type="text" id="buscarAlerta" placeholder="Buscar por tipo, ubicación o clave..." aria-label="Buscar alertas por tipo, ubicación o clave">
+                        <input type="text" id="buscarAlerta" placeholder="Buscar por tipo, ubicación o clave..."
+                            aria-label="Buscar alertas por tipo, ubicación o clave">
                     </div>
                 </div>
 
@@ -263,10 +234,18 @@
                 </div>
 
                 <div class="filtro-grupo">
-                    <label for="filtroFecha">Fecha</label>
+                    <label for="filtroFecha">Fecha de inicio</label>
                     <div class="input-busqueda">
                         <i class="fa-regular fa-calendar" aria-hidden="true"></i>
                         <input type="date" id="filtroFecha">
+                    </div>
+                </div>
+
+                <div class="filtro-grupo">
+                    <label for="filtroFechaFin">Fecha de fin</label>
+                    <div class="input-busqueda">
+                        <i class="fa-regular fa-calendar" aria-hidden="true"></i>
+                        <input type="date" id="filtroFechaFin">
                     </div>
                 </div>
 
@@ -276,9 +255,6 @@
                 </button>
             </section>
 
-            <!-- ===================================
-                 TABLA / LISTADO
-            ==================================== -->
             <div class="historial-registro-layout">
                 <section class="historial-card">
                     <div class="historial-card-header">
@@ -296,7 +272,7 @@
                                     <th>Ubicación</th>
                                     <th>Fecha</th>
                                     <th>Hora</th>
-                                    <th>Estado</th>
+                                    <th>Estado final y tiempo de respuesta</th>
                                     <th>Acción</th>
                                 </tr>
                             </thead>
@@ -305,7 +281,6 @@
                         </table>
                     </div>
 
-                    <!-- SIN RESULTADOS -->
                     <div class="sin-resultados" id="sinResultados">
                         <i class="fa-solid fa-magnifying-glass"></i>
                         <h3>No encontramos alertas</h3>
@@ -345,6 +320,19 @@
                                 <span><i class="fa-solid fa-shield-halved"></i> Estado</span>
                                 <strong id="detalleEstado">—</strong>
                             </div>
+                            <div class="detalle-fila">
+                                <span><i class="fa-solid fa-car-side" aria-hidden="true"></i> Patrulla</span>
+                                <strong id="detallePatrulla">No asignada</strong>
+                            </div>
+                            <div class="detalle-fila">
+                                <span><i class="fa-solid fa-stopwatch" aria-hidden="true"></i> Tiempo de respuesta</span>
+                                <strong id="detalleTiempoRespuesta">No disponible</strong>
+                            </div>
+                            <section class="detalle-fila detalle-linea-tiempo">
+                                <h3>Línea de tiempo</h3>
+                                <ol id="lineaTiempoIncidente" class="linea-tiempo"
+                                    aria-label="Cronología de atención"></ol>
+                            </section>
                             <div class="detalle-fila detalle-reporte">
                                 <span><i class="fa-solid fa-align-left"></i> Detalle del reporte</span>
                                 <p id="detalleReporteTexto">Elige un reporte para consultar sus detalles.</p>
@@ -371,9 +359,6 @@
         </section>
     </main>
 
-    <!-- ===================================
-         MENÚ MOBILE
-    ==================================== -->
     <nav class="menu-inferior-mobile" aria-label="Navegación móvil">
         <a href="mapa.html">
             <i class="fa-solid fa-map-location-dot" aria-hidden="true"></i>
@@ -401,12 +386,11 @@
             <i class="fa-solid fa-user-shield" aria-hidden="true"></i><span>Admin</span>
         </a>
     </nav>
-
-    <!-- Firebase modular -->
     <script type="module" src="../js/estado-cuenta.js?v=modular-sdk-1"></script>
     <script src="../js/ubicacion.js"></script>
-    <script src="../js/notificaciones.js?v=20261029-notifications-read-v2"></script>
+    <script src="../js/notificaciones.js?v=expire-notifications-20261110"></script>
     <script type="module" src="../js/coalerta-data.js?v=active-delegation-role-20261101"></script>
-    <script type="module" src="../js/historial.js?v=history-friendly-errors-20261030"></script>
+    <script type="module" src="../js/historial.js?v=shared-core-20261106"></script>
 </body>
+
 </html>

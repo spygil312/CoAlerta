@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,33 +13,34 @@
     <link rel="icon" type="image/svg+xml" href="../assets/svg/logo.svg?v=2">
     <script>
         (function () {
-        try {
-            const profile = JSON.parse(localStorage.getItem("coalerta_usuario") || "null");
-            const cachedRole = JSON.parse(localStorage.getItem("userRole") || "null");
-            if (localStorage.getItem("coalertaSesion") === "activa" &&
-                profile && cachedRole && profile.uid === cachedRole.uid &&
-                String(profile.rol || "").trim().toLowerCase() === cachedRole.role) {
-                if (cachedRole.isAdmin === true) document.documentElement.classList.add("role-admin");
-                if (cachedRole.isAdmin === true ||
-                    ["coordinador", "administrador", "admin"].includes(cachedRole.role)) {
-                    document.documentElement.classList.add("role-coordinator");
+            try {
+                const profile = JSON.parse(localStorage.getItem("coalerta_usuario") || "null");
+                const cachedRole = JSON.parse(localStorage.getItem("userRole") || "null");
+                if (localStorage.getItem("coalertaSesion") === "activa" &&
+                    profile && cachedRole && profile.uid === cachedRole.uid &&
+                    String(profile.rol || "").trim().toLowerCase() === cachedRole.role) {
+                    if (cachedRole.isAdmin === true) document.documentElement.classList.add("role-admin");
+                    if (cachedRole.isAdmin === true ||
+                        ["coordinador", "administrador", "admin"].includes(cachedRole.role)) {
+                        document.documentElement.classList.add("role-coordinator");
+                    }
+                    if (cachedRole.isAdmin === true ||
+                        ["agente", "seguridad", "administrador", "admin"].includes(cachedRole.role)) {
+                        document.documentElement.classList.add("role-security");
+                    }
                 }
-                if (cachedRole.isAdmin === true ||
-                    ["agente", "seguridad", "administrador", "admin"].includes(cachedRole.role)) {
-                    document.documentElement.classList.add("role-security");
-                }
+            } catch (error) {
+                console.warn("No se pudo recuperar el rol guardado para el menú:", error);
             }
-        } catch (error) {
-            console.warn("No se pudo recuperar el rol guardado para el menú:", error);
-        }
         })();
     </script>
     <link rel="stylesheet" href="../css/estilos.css?v=mobile-nav-fixed-20261102">
     <link rel="stylesheet" href="../css/responsive.css">
     <link rel="stylesheet" href="../css/mapa.css?v=ordered-panels-gps-dispatch-20261029">
-    <link rel="stylesheet" href="../css/administracion.css?v=unit-assignment-20261029">
+    <link rel="stylesheet" href="../css/administracion.css?v=sla-admin-dashboard-20261109">
     <script src="../js/tema.js?v=20261029-theme-scroll"></script>
 </head>
+
 <body class="pagina-administracion" data-role-navigation-ready="false">
     <header class="mapa-header">
         <div class="mapa-header-contenido">
@@ -50,8 +52,10 @@
                 <div class="estado-sistema"><span class="estado-punto" aria-hidden="true"></span>Administración</div>
             </div>
             <div class="mapa-header-derecha">
-                <button class="boton-header" type="button" id="btnNotificaciones" title="Notificaciones" aria-label="Notificaciones" aria-expanded="false" aria-controls="menuNotificaciones">
-                    <i class="fa-solid fa-bell" aria-hidden="true"></i><span class="notificacion-contador" hidden></span>
+                <button class="boton-header" type="button" id="btnNotificaciones" title="Notificaciones"
+                    aria-label="Notificaciones" aria-expanded="false" aria-controls="menuNotificaciones">
+                    <i class="fa-solid fa-bell" aria-hidden="true"></i><span class="notificacion-contador"
+                        hidden></span>
                 </button>
                 <div id="menuNotificaciones" class="menu-notificaciones" hidden>
                     <h4>Notificaciones</h4>
@@ -74,8 +78,10 @@
             </div>
             <nav class="sidebar-menu">
                 <a href="mapa.html"><i class="fa-solid fa-map-location-dot" aria-hidden="true"></i><span>Mapa</span></a>
-                <a href="historial.html"><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i><span>Historial</span></a>
-                <a href="comunidad.html"><i class="fa-solid fa-users" aria-hidden="true"></i><span>Mi comunidad</span></a>
+                <a href="historial.html"><i class="fa-solid fa-clock-rotate-left"
+                        aria-hidden="true"></i><span>Historial</span></a>
+                <a href="comunidad.html"><i class="fa-solid fa-users" aria-hidden="true"></i><span>Mi
+                        comunidad</span></a>
                 <a href="perfil.html"><i class="fa-solid fa-user-gear" aria-hidden="true"></i><span>Mi perfil</span></a>
                 <a href="administracion.html" class="activo" aria-current="page" data-admin-only hidden>
                     <i class="fa-solid fa-user-shield" aria-hidden="true"></i><span>Administración</span>
@@ -108,15 +114,41 @@
             <section id="avisoAdministracion" class="administracion-aviso" role="status" aria-live="polite">
                 Verificando autorización…
             </section>
+            <section id="panelMetricasSla" class="administracion-panel administracion-sla-panel"
+                aria-labelledby="tituloMetricasSla" hidden>
+                <div class="administracion-panel-cabecera administracion-sla-cabecera">
+                    <div>
+                        <h2 id="tituloMetricasSla">SLA diario por comunidad</h2>
+                        <p>Tiempo promedio entre el registro de la alerta y la llegada de la unidad.</p>
+                    </div>
+                    <div class="administracion-sla-total">
+                        <strong id="slaPromedioGeneral">—</strong>
+                        <span id="slaCantidadMuestras">Cargando datos del día…</span>
+                    </div>
+                </div>
+                <div class="administracion-sla-comparativa">
+                    <h3>Comparativa entre comunidades</h3>
+                    <div id="slaComunidades" class="administracion-sla-lista" role="list"
+                        aria-label="Tiempo promedio de respuesta por comunidad"></div>
+                </div>
+                <p id="slaActualizacion" class="administracion-sla-nota" role="status" aria-live="polite">
+                    Datos del día en curso. El panel se actualiza al recibir cambios y al cambiar el día; consulta
+                    únicamente los incidentes del día, con un límite de 500 documentos.
+                </p>
+            </section>
             <section id="panelSolicitudes" class="administracion-panel" aria-label="Solicitudes pendientes" hidden>
                 <div class="administracion-panel-cabecera">
-                    <div><h2>Pendientes de revisión</h2><p id="cantidadSolicitudes">0 solicitudes</p></div>
+                    <div>
+                        <h2>Pendientes de revisión</h2>
+                        <p id="cantidadSolicitudes">0 solicitudes</p>
+                    </div>
                     <i class="fa-solid fa-user-clock" aria-hidden="true"></i>
                 </div>
                 <div id="listaSolicitudes" class="administracion-lista"></div>
             </section>
 
-            <section id="panelAsignacionUnidades" class="administracion-panel administracion-unidades-panel" aria-label="Asignación de unidades" hidden>
+            <section id="panelAsignacionUnidades" class="administracion-panel administracion-unidades-panel"
+                aria-label="Asignación de unidades" hidden>
                 <div class="administracion-panel-cabecera">
                     <div>
                         <h2>Asignación de unidades</h2>
@@ -159,8 +191,9 @@
     </nav>
 
     <script type="module" src="../js/estado-cuenta.js?v=modular-sdk-1"></script>
-    <script src="../js/notificaciones.js?v=20261029-notifications-read-v2"></script>
+    <script src="../js/notificaciones.js?v=expire-notifications-20261110"></script>
     <script type="module" src="../js/coalerta-data.js?v=active-delegation-role-20261101"></script>
-    <script type="module" src="../js/administracion.js?v=admin-all-panels-20261029"></script>
+    <script type="module" src="../js/administracion.js?v=sla-admin-dashboard-20261109"></script>
 </body>
+
 </html>

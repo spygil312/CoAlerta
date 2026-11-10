@@ -1,7 +1,3 @@
-/* =========================================================
-   COALERTA - HISTORIAL.CSS
-========================================================= */
-
 .pagina-historial {
     min-width: 320px;
     min-height: 100vh;
@@ -355,6 +351,10 @@ body.role-security .menu-inferior-mobile a[data-role-link="security"] {
     display: flex;
     align-items: center;
     gap: 8px;
+}
+
+.btn-exportar[hidden] {
+    display: none;
 }
 
 .btn-exportar:hover {
@@ -1350,5 +1350,67 @@ body.role-security .menu-inferior-mobile a[data-role-link="security"] {
     .historial-detalle-panel .detalle-acciones {
         padding-right: 18px;
         padding-left: 18px;
+    }
+}
+
+.detalle-linea-tiempo {
+    display: block;
+}
+
+.detalle-linea-tiempo h3 {
+    margin: 0 0 12px;
+    color: var(--texto);
+    font-size: 14px;
+}
+
+.linea-tiempo {
+    display: grid;
+    gap: 14px;
+    margin: 12px 0 0;
+    padding: 0 0 0 22px;
+    list-style: none;
+    border-left: 2px solid var(--borde);
+}
+
+.linea-tiempo li {
+    position: relative;
+    animation: aparecer-evento .25s ease both;
+}
+
+.linea-tiempo li::before {
+    position: absolute;
+    top: 4px;
+    left: -29px;
+    width: 12px;
+    height: 12px;
+    border: 2px solid var(--verde-principal);
+    border-radius: 50%;
+    background: var(--blanco);
+    content: "";
+}
+
+.linea-tiempo strong,
+.linea-tiempo time {
+    display: block;
+}
+
+.linea-tiempo time {
+    color: var(--texto-secundario);
+    font-size: 12px;
+}
+
+.tabla-historial tr.fila-alerta-buscada {
+    outline: 2px solid var(--verde-principal);
+    outline-offset: -2px;
+}
+
+@keyframes aparecer-evento {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .linea-tiempo li {
+        animation: none;
     }
 }

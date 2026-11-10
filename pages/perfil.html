@@ -1,42 +1,39 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#168A5B">
     <title>Mi perfil | CoAlerta</title>
-
-    <!-- FUENTE -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- ICONOS -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <link rel="icon" type="image/svg+xml" href="../assets/svg/logo.svg?v=2">
     <script>
         (function () {
-        try {
-            const profile = JSON.parse(localStorage.getItem("coalerta_usuario") || "null");
-            const cachedRole = JSON.parse(localStorage.getItem("userRole") || "null");
-            if (localStorage.getItem("coalertaSesion") === "activa" &&
-                profile && cachedRole && profile.uid === cachedRole.uid &&
-                String(profile.rol || "").trim().toLowerCase() === cachedRole.role) {
-                if (cachedRole.isAdmin === true) document.documentElement.classList.add("role-admin");
-                if (cachedRole.isAdmin === true ||
-                    ["coordinador", "administrador", "admin"].includes(cachedRole.role)) {
-                    document.documentElement.classList.add("role-coordinator");
+            try {
+                const profile = JSON.parse(localStorage.getItem("coalerta_usuario") || "null");
+                const cachedRole = JSON.parse(localStorage.getItem("userRole") || "null");
+                if (localStorage.getItem("coalertaSesion") === "activa" &&
+                    profile && cachedRole && profile.uid === cachedRole.uid &&
+                    String(profile.rol || "").trim().toLowerCase() === cachedRole.role) {
+                    if (cachedRole.isAdmin === true) document.documentElement.classList.add("role-admin");
+                    if (cachedRole.isAdmin === true ||
+                        ["coordinador", "administrador", "admin"].includes(cachedRole.role)) {
+                        document.documentElement.classList.add("role-coordinator");
+                    }
+                    if (cachedRole.isAdmin === true ||
+                        ["agente", "seguridad", "administrador", "admin"].includes(cachedRole.role)) {
+                        document.documentElement.classList.add("role-security");
+                    }
                 }
-                if (cachedRole.isAdmin === true ||
-                    ["agente", "seguridad", "administrador", "admin"].includes(cachedRole.role)) {
-                    document.documentElement.classList.add("role-security");
-                }
+            } catch (error) {
+                console.warn("No se pudo recuperar el rol guardado para el menú:", error);
             }
-        } catch (error) {
-            console.warn("No se pudo recuperar el rol guardado para el menú:", error);
-        }
         })();
     </script>
-    <!-- CSS -->
     <link rel="stylesheet" href="../css/estilos.css?v=mobile-nav-fixed-20261102">
     <link rel="stylesheet" href="../css/responsive.css">
     <link rel="stylesheet" href="../css/mapa.css?v=ordered-panels-gps-dispatch-20261029">
@@ -60,9 +57,8 @@
             </div>
 
             <div class="mapa-header-derecha">
-                <button class="boton-header" type="button" id="btnNotificaciones"
-                    title="Notificaciones" aria-label="Notificaciones" aria-expanded="false"
-                    aria-controls="menuNotificaciones">
+                <button class="boton-header" type="button" id="btnNotificaciones" title="Notificaciones"
+                    aria-label="Notificaciones" aria-expanded="false" aria-controls="menuNotificaciones">
                     <i class="fa-solid fa-bell" aria-hidden="true"></i>
                     <span class="notificacion-contador" hidden></span>
                 </button>
@@ -144,8 +140,8 @@
                         <i class="fa-solid fa-user" id="perfilAvatarIcon" aria-hidden="true"></i>
                         <img id="perfilAvatarImg" alt="Foto de perfil" hidden>
                         <input type="file" id="inputFoto" accept="image/*" hidden>
-                        <button class="btn-cambiar-foto" type="button" id="btnCambiarFoto"
-                            title="Cambiar foto" aria-label="Cambiar foto de perfil">
+                        <button class="btn-cambiar-foto" type="button" id="btnCambiarFoto" title="Cambiar foto"
+                            aria-label="Cambiar foto de perfil">
                             <i class="fa-solid fa-camera" aria-hidden="true"></i>
                         </button>
                     </div>
@@ -315,7 +311,8 @@
                         <div class="perfil-card-header">
                             <div>
                                 <h2>Contactos de emergencia</h2>
-                                <p>Guarda hasta dos contactos para tener sus datos disponibles durante una emergencia.</p>
+                                <p>Guarda hasta dos contactos para tener sus datos disponibles durante una emergencia.
+                                </p>
                             </div>
                             <div class="perfil-card-icono">
                                 <i class="fa-solid fa-address-book" aria-hidden="true"></i>
@@ -334,7 +331,8 @@
                                     <label for="contacto1Telefono">Celular del contacto 1</label>
                                     <div class="input-con-icono">
                                         <i class="fa-solid fa-phone" aria-hidden="true"></i>
-                                        <input type="tel" id="contacto1Telefono" inputmode="numeric" maxlength="9" placeholder="9 dígitos">
+                                        <input type="tel" id="contacto1Telefono" inputmode="numeric" maxlength="9"
+                                            placeholder="9 dígitos">
                                     </div>
                                 </div>
                                 <div class="grupo-formulario">
@@ -348,11 +346,13 @@
                                     <label for="contacto2Telefono">Celular del contacto 2 (opcional)</label>
                                     <div class="input-con-icono">
                                         <i class="fa-solid fa-phone" aria-hidden="true"></i>
-                                        <input type="tel" id="contacto2Telefono" inputmode="numeric" maxlength="9" placeholder="9 dígitos">
+                                        <input type="tel" id="contacto2Telefono" inputmode="numeric" maxlength="9"
+                                            placeholder="9 dígitos">
                                     </div>
                                 </div>
                             </div>
-                            <p class="campo-ayuda">Los contactos quedan guardados en Firebase. La mensajería directa a contactos requiere una integración de envío configurada.</p>
+                            <p class="campo-ayuda">Los contactos quedan guardados en Firebase. La mensajería directa a
+                                contactos requiere una integración de envío configurada.</p>
                             <div class="mensaje-perfil" id="mensajeContactos" aria-live="polite"></div>
                             <div class="perfil-form-acciones">
                                 <button type="submit" class="btn-guardar-cambios">
@@ -373,17 +373,20 @@
                             </div>
                         </div>
                         <form class="perfil-formulario" id="formDesactivarCuenta">
-                            <p id="preguntaSeguridadActual" class="campo-ayuda">Confirma tu identidad ingresando el DNI asociado a esta cuenta.</p>
+                            <p id="preguntaSeguridadActual" class="campo-ayuda">Confirma tu identidad ingresando el DNI
+                                asociado a esta cuenta.</p>
                             <div class="perfil-form-grid">
                                 <div class="grupo-formulario">
                                     <label for="dniDesactivacion">DNI del titular</label>
                                     <div class="input-con-icono">
                                         <i class="fa-solid fa-id-card" aria-hidden="true"></i>
-                                        <input type="text" id="dniDesactivacion" inputmode="numeric" maxlength="8" required>
+                                        <input type="text" id="dniDesactivacion" inputmode="numeric" maxlength="8"
+                                            required>
                                     </div>
                                 </div>
                             </div>
-                            <p class="campo-ayuda">Esta acción desactiva la cuenta y cierra la sesión actual. Se requiere confirmar el DNI asociado para continuar.</p>
+                            <p class="campo-ayuda">Esta acción desactiva la cuenta y cierra la sesión actual. Se
+                                requiere confirmar el DNI asociado para continuar.</p>
                             <div class="mensaje-perfil" id="mensajeDesactivacion" aria-live="polite"></div>
                             <div class="perfil-form-acciones">
                                 <button type="submit" class="btn-cambiar-password">
@@ -407,57 +410,70 @@
                         <div class="preferencias-lista">
                             <div class="preferencia-item">
                                 <div class="preferencia-info">
-                                    <div class="preferencia-icono"><i class="fa-solid fa-bell" aria-hidden="true"></i></div>
+                                    <div class="preferencia-icono"><i class="fa-solid fa-bell" aria-hidden="true"></i>
+                                    </div>
                                     <div>
                                         <strong id="preferenciaAlertasLabel">Notificaciones de alertas</strong>
-                                        <span id="preferenciaAlertasAyuda">Recibe avisos sobre incidentes cercanos.</span>
+                                        <span id="preferenciaAlertasAyuda">Recibe avisos sobre incidentes
+                                            cercanos.</span>
                                     </div>
                                 </div>
                                 <label class="switch">
                                     <input type="checkbox" id="preferenciaAlertas" checked
-                                        aria-labelledby="preferenciaAlertasLabel" aria-describedby="preferenciaAlertasAyuda">
+                                        aria-labelledby="preferenciaAlertasLabel"
+                                        aria-describedby="preferenciaAlertasAyuda">
                                     <span class="slider" aria-hidden="true"></span>
                                 </label>
                             </div>
                             <div class="preferencia-item">
                                 <div class="preferencia-info">
-                                    <div class="preferencia-icono"><i class="fa-solid fa-volume-high" aria-hidden="true"></i></div>
+                                    <div class="preferencia-icono"><i class="fa-solid fa-volume-high"
+                                            aria-hidden="true"></i></div>
                                     <div>
                                         <strong id="preferenciaSonidoLabel">Sonido de emergencia</strong>
-                                        <span id="preferenciaSonidoAyuda">Reproduce un tono cuando llegue una alerta activa nueva. El navegador puede requerir una interacción para habilitar el audio.</span>
+                                        <span id="preferenciaSonidoAyuda">Reproduce un tono cuando llegue una alerta
+                                            activa nueva. El navegador puede requerir una interacción para habilitar el
+                                            audio.</span>
                                     </div>
                                 </div>
                                 <label class="switch">
                                     <input type="checkbox" id="preferenciaSonido" checked
-                                        aria-labelledby="preferenciaSonidoLabel" aria-describedby="preferenciaSonidoAyuda">
+                                        aria-labelledby="preferenciaSonidoLabel"
+                                        aria-describedby="preferenciaSonidoAyuda">
                                     <span class="slider" aria-hidden="true"></span>
                                 </label>
                             </div>
                             <div class="preferencia-item">
                                 <div class="preferencia-info">
-                                    <div class="preferencia-icono"><i class="fa-solid fa-location-crosshairs" aria-hidden="true"></i></div>
+                                    <div class="preferencia-icono"><i class="fa-solid fa-location-crosshairs"
+                                            aria-hidden="true"></i></div>
                                     <div>
                                         <strong id="preferenciaUbicacionLabel">Permitir ubicación</strong>
-                                        <span id="preferenciaUbicacionAyuda">Facilita el envío de tu ubicación en una emergencia.</span>
+                                        <span id="preferenciaUbicacionAyuda">Facilita el envío de tu ubicación en una
+                                            emergencia.</span>
                                     </div>
                                 </div>
                                 <label class="switch">
                                     <input type="checkbox" id="preferenciaUbicacion" checked
-                                        aria-labelledby="preferenciaUbicacionLabel" aria-describedby="preferenciaUbicacionAyuda">
+                                        aria-labelledby="preferenciaUbicacionLabel"
+                                        aria-describedby="preferenciaUbicacionAyuda">
                                     <span class="slider" aria-hidden="true"></span>
                                 </label>
                             </div>
                             <div class="preferencia-item">
                                 <div class="preferencia-info">
-                                    <div class="preferencia-icono"><i class="fa-solid fa-moon" aria-hidden="true"></i></div>
+                                    <div class="preferencia-icono"><i class="fa-solid fa-moon" aria-hidden="true"></i>
+                                    </div>
                                     <div>
                                         <strong id="preferenciaTemaOscuroLabel">Modo oscuro</strong>
-                                        <span id="preferenciaTemaOscuroAyuda">Usa una paleta oscura de alto contraste en toda la aplicación.</span>
+                                        <span id="preferenciaTemaOscuroAyuda">Usa una paleta oscura de alto contraste en
+                                            toda la aplicación.</span>
                                     </div>
                                 </div>
                                 <label class="switch">
                                     <input type="checkbox" id="preferenciaTemaOscuro"
-                                        aria-labelledby="preferenciaTemaOscuroLabel" aria-describedby="preferenciaTemaOscuroAyuda">
+                                        aria-labelledby="preferenciaTemaOscuroLabel"
+                                        aria-describedby="preferenciaTemaOscuroAyuda">
                                     <span class="slider" aria-hidden="true"></span>
                                 </label>
                             </div>
@@ -536,7 +552,8 @@
     <script type="module" src="../js/estado-cuenta.js?v=modular-sdk-1"></script>
     <script type="module" src="../js/coalerta-data.js?v=active-delegation-role-20261101"></script>
     <script src="../js/ubicacion.js"></script>
-    <script src="../js/notificaciones.js?v=20261029-notifications-read-v2"></script>
-    <script type="module" src="../js/perfil.js?v=community-member-contact-20261029"></script>
+    <script src="../js/notificaciones.js?v=expire-notifications-20261110"></script>
+    <script type="module" src="../js/perfil.js?v=shared-core-20261106"></script>
 </body>
+
 </html>

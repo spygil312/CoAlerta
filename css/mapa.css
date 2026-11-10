@@ -938,7 +938,7 @@ body.role-security .menu-inferior-mobile a[data-role-link="security"] {
     flex-direction: column;
     align-items: center;
     gap: 10px;
-    font-size: 16px;
+    font-size: 16pt;
     font-weight: 600;
     cursor: pointer;
     transition: 0.2s;
@@ -972,8 +972,13 @@ body.role-security .menu-inferior-mobile a[data-role-link="security"] {
     font-size: 13px;
     color: var(--texto-secundario);
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 10px;
+}
+
+.modal-ubicacion .consentimiento-gps {
+    flex-basis: 100%;
 }
 
 @media (max-width: 1100px) {

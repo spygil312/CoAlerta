@@ -1,5 +1,9 @@
 import { signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { auth } from "./firebase-config.js?v=spark-direct-firestore-1";
+import {
+    configurarCierreSesion,
+    escapeHtml
+} from "./general.js?v=shared-core-20261106";
 
 document.addEventListener("DOMContentLoaded", function () {
     const data = window.coalertaData;
@@ -20,6 +24,9 @@ document.addEventListener("DOMContentLoaded", function () {
     let heatLayer;
     let heatmapMap;
     let watchId = null;
+    let patrolLocationSyncTimer = null;
+    let latestPatrolPoint = null;
+    let patrolLocationSyncInProgress = false;
     let heatmapEnabled = false;
     let mapNightMode = false;
     let zone = null;
@@ -27,7 +34,14 @@ document.addEventListener("DOMContentLoaded", function () {
     let knownIncidentIds = null;
     let auditExpiryTimer = null;
 
-    document.getElementById("btnCerrarSesionLateral").addEventListener("click", closeSession);
+    configurarCierreSesion({
+        auth,
+        signOut,
+        confirmationMessage: "¿Seguro que deseas cerrar sesión?",
+        clearCachedSession: true,
+        replaceLocation: true,
+        errorMessage: (error) => error.message || "No se pudo cerrar la sesión."
+    });
     window.addEventListener("coalerta:datos-listos", initializeFromProfile);
     window.addEventListener("coalerta:incidentes-actualizados", function () {
         alertOnNewIncidents();
@@ -142,19 +156,6 @@ document.addEventListener("DOMContentLoaded", function () {
         avatarIcon.hidden = true;
     }
 
-    async function closeSession() {
-        if (!window.confirm("¿Seguro que deseas cerrar sesión?")) return;
-        try {
-            await signOut(auth);
-            localStorage.removeItem("coalerta_usuario");
-            localStorage.removeItem("coalertaSesion");
-            window.location.replace("login.html");
-        } catch (error) {
-            console.error("No se pudo cerrar la sesión:", error);
-            window.alert(error.message || "No se pudo cerrar la sesión.");
-        }
-    }
-
     function configureMap() {
         const element = document.getElementById("mapaCentral");
         if (!element || typeof L === "undefined") {
@@ -245,7 +246,8 @@ document.addEventListener("DOMContentLoaded", function () {
             : isAdminViewer
                 ? "Vista administrativa de los incidentes y la operación de coordinación."
                 : "Acepta alertas derivadas, actualiza el estado de respuesta y finaliza el incidente.";
-        ["panelZona", "panelAviso", "panelDelegacion"].forEach((id) => {
+        document.getElementById("panelZona").hidden = !(isCoordinator || isAdminViewer);
+        ["panelAviso", "panelDelegacion"].forEach((id) => {
             document.getElementById(id).hidden = !isCoordinator;
         });
     }
@@ -295,7 +297,7 @@ document.addEventListener("DOMContentLoaded", function () {
         iconElement.setAttribute("aria-hidden", "true");
         icon.append(iconElement);
         const title = document.createElement("h3");
-        title.textContent = `${alert.tipo || "Incidente"}${Number(alert.reportes) > 1 ? ` · ${alert.reportes} reportes` : ""}`;
+        title.textContent = `${Number(alert.reportes) > 1 ? "Incidente Grupal · " : ""}${alert.tipo || "Incidente"}${Number(alert.reportes) > 1 ? ` · ${alert.reportes} reportes` : ""}`;
         identity.append(icon, title);
         const state = document.createElement("span");
         state.className = `central-estado${alert.estado === "Auxilio en camino" ? " central-estado-en-camino" : ""}`;
@@ -306,7 +308,15 @@ document.addEventListener("DOMContentLoaded", function () {
         meta.className = "central-alerta-meta";
         meta.textContent = `${formatDate(alert.timestamp)} · ${alert.id}`;
         const description = document.createElement("p");
-        description.textContent = `${alert.detalle || "Sin detalle adicional"} · ${alert.ubicacion || "Ubicación no disponible"}${hasCoordinates(alert) ? ` · ${Number(alert.latitud).toFixed(5)}, ${Number(alert.longitud).toFixed(5)}` : " · Sin GPS"}`;
+        const approximateAddress = typeof alert.direccionAproximada === "string" && alert.direccionAproximada.trim()
+            ? alert.direccionAproximada.trim()
+            : typeof alert.ubicacion === "string" && alert.ubicacion.trim()
+                ? alert.ubicacion.trim()
+                : hasCoordinates(alert)
+                    ? `Referencia GPS aproximada: ${Number(alert.latitud).toFixed(5)}, ${Number(alert.longitud).toFixed(5)}`
+                    : "Dirección aproximada no disponible";
+        description.textContent =
+            `${alert.detalle || "Sin detalle adicional"} · Dirección aproximada: ${approximateAddress}`;
         article.append(header, meta, description);
         if (alert.unidad) {
             const assigned = document.createElement("p");
@@ -322,7 +332,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const actions = document.createElement("div");
         actions.className = "central-acciones-alerta";
         if (activeRole === "coordinador" && data.isActive(alert)) {
-            actions.append(makeAction("derive", "Validar y derivar", "central-button"));
+            actions.append(makeAction("derive", "Validar y Derivar", "central-button"));
             const reason = document.createElement("select");
             reason.setAttribute("aria-label", "Motivo para descartar");
             reason.dataset.reasonFor = String(alert.id);
@@ -332,11 +342,11 @@ document.addEventListener("DOMContentLoaded", function () {
                 option.textContent = value;
                 reason.append(option);
             });
-            actions.append(reason, makeAction("discard", "Descartar alerta", "central-button central-button-peligro"));
+            actions.append(reason, makeAction("discard", "Descartar Falsa Alarma", "central-button central-button-peligro"));
         } else if (activeRole === "agente" && alert.estado === "Derivada a Central") {
             const profile = data.getProfile();
             if (profile && profile.patrullaId) {
-                actions.append(makeAction("dispatch", "Aceptar y despachar", "central-button"));
+                actions.append(makeAction("dispatch", "EN CAMINO", "central-button"));
             } else {
                 const setup = document.createElement("small");
                 setup.textContent = "La cuenta de agente necesita una unidad asignada por el administrador.";
@@ -348,13 +358,13 @@ document.addEventListener("DOMContentLoaded", function () {
             const outcome = document.createElement("select");
             outcome.setAttribute("aria-label", "Resultado del incidente");
             outcome.dataset.outcomeFor = String(alert.id);
-            ["Intervención preventiva", "Sujeto intervenido", "Falsa alarma"].forEach((value) => {
+            ["Delincuente retenido", "Intervención preventiva", "Falsa alarma"].forEach((value) => {
                 const option = document.createElement("option");
                 option.value = value;
                 option.textContent = value;
                 outcome.append(option);
             });
-            actions.append(outcome, makeAction("close", "Incidente atendido", "central-button"));
+            actions.append(outcome, makeAction("close", "Finalizar / Incidente Atendido", "central-button"));
         }
         if (hasCoordinates(alert)) {
             actions.append(makeAction(
@@ -460,12 +470,15 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         const coordinates = `${Number(origin.longitud)},${Number(origin.latitud)};${Number(alert.longitud)},${Number(alert.latitud)}`;
         const response = await fetch(
-            `https://router.project-osrm.org/route/v1/driving/${coordinates}?overview=full&geometries=geojson`,
+            `https://router.project-osrm.org/route/v1/driving/${coordinates}?overview=full&geometries=geojson&alternatives=true`,
             { headers: { Accept: "application/json" } }
         );
         if (!response.ok) throw new Error("El servicio público de rutas no está disponible. Inténtalo nuevamente.");
         const result = await response.json();
-        const route = result.routes && result.routes[0];
+        const routes = Array.isArray(result.routes) ? result.routes : [];
+        const route = routes.reduce((shortest, candidate) =>
+            !shortest || candidate.distance < shortest.distance ? candidate : shortest, null
+        );
         if (!route || !route.geometry || !Array.isArray(route.geometry.coordinates)) {
             throw new Error("No se encontró una ruta vial entre la unidad y la alerta.");
         }
@@ -475,8 +488,25 @@ document.addEventListener("DOMContentLoaded", function () {
         map.fitBounds(line.getBounds(), { padding: [30, 30] });
         const distanceKm = (route.distance / 1000).toLocaleString("es", { maximumFractionDigits: 1 });
         const durationMinutes = Math.max(1, Math.ceil(route.duration / 60));
-        document.getElementById("estadoRutaCentral").textContent =
-            `Ruta calculada desde ${origin.codigo || "la unidad más cercana"}: ${distanceKm} km · ${durationMinutes} min estimados.`;
+        const navigationUrl = new URL("https://www.google.com/maps/dir/");
+        navigationUrl.searchParams.set("api", "1");
+        navigationUrl.searchParams.set("origin", `${origin.latitud},${origin.longitud}`);
+        navigationUrl.searchParams.set("destination", `${alert.latitud},${alert.longitud}`);
+        navigationUrl.searchParams.set("travelmode", "driving");
+        navigationUrl.searchParams.set("dir_action", "navigate");
+        navigationUrl.searchParams.set("traffic", "1");
+        const navigationLink = document.createElement("a");
+        navigationLink.href = navigationUrl.toString();
+        navigationLink.target = "_blank";
+        navigationLink.rel = "noopener noreferrer";
+        navigationLink.textContent = "Abrir navegación en Google Maps ↗";
+        const routeStatus = document.getElementById("estadoRutaCentral");
+        routeStatus.replaceChildren(
+            document.createTextNode(
+                `Ruta vial más corta entre las alternativas de OSRM desde ${origin.codigo || "la unidad más cercana"}: ${distanceKm} km · ${durationMinutes} min estimados. `
+            ),
+            navigationLink
+        );
     }
 
     async function publishNotice() {
@@ -571,7 +601,7 @@ document.addEventListener("DOMContentLoaded", function () {
         if (incident && String(incident.resultado || "").trim() === "Falsa alarma") {
             document.getElementById("plantillaAviso").value = "Falsa alarma aclarada por autoridades";
         } else if (falseAlarm.selected) {
-            document.getElementById("plantillaAviso").value = "Emergencia canalizada";
+            document.getElementById("plantillaAviso").value = "Emergencia Canalizada";
         }
     }
 
@@ -699,6 +729,11 @@ document.addEventListener("DOMContentLoaded", function () {
         if (watchId !== null) {
             navigator.geolocation.clearWatch(watchId);
             watchId = null;
+            if (patrolLocationSyncTimer !== null) {
+                window.clearTimeout(patrolLocationSyncTimer);
+                patrolLocationSyncTimer = null;
+            }
+            latestPatrolPoint = null;
             status.textContent = "Ubicación GPS de patrulla detenida.";
             return;
         }
@@ -707,29 +742,52 @@ document.addEventListener("DOMContentLoaded", function () {
             return;
         }
         status.textContent = "Conectando el GPS de esta unidad con Firebase...";
-        let lastUpdate = 0;
-        watchId = navigator.geolocation.watchPosition(async (position) => {
-            if (Date.now() - lastUpdate < 5000) return;
-            lastUpdate = Date.now();
-            try {
-                await data.updatePatrolLocation({
-                    latitud: position.coords.latitude,
-                    longitud: position.coords.longitude,
-                    precisionMetros: position.coords.accuracy
-                });
-                status.textContent = `Ubicación de la unidad sincronizada ${new Date().toLocaleTimeString()}.`;
-            } catch (error) {
-                console.error("No se pudo sincronizar la ubicación de patrulla:", error);
-                status.textContent = error.message || "No se pudo sincronizar la ubicación de patrulla.";
-                navigator.geolocation.clearWatch(watchId);
-                watchId = null;
-            }
+        watchId = navigator.geolocation.watchPosition((position) => {
+            latestPatrolPoint = {
+                latitud: position.coords.latitude,
+                longitud: position.coords.longitude,
+                precisionMetros: position.coords.accuracy
+            };
+            if (!patrolLocationSyncInProgress) void syncPatrolLocation();
         }, (error) => {
             console.error("No se pudo obtener la ubicación de patrulla:", error);
             status.textContent = "No se pudo obtener ubicación. Revisa el permiso del navegador e inténtalo otra vez.";
             if (watchId !== null) navigator.geolocation.clearWatch(watchId);
             watchId = null;
+            if (patrolLocationSyncTimer !== null) {
+                window.clearTimeout(patrolLocationSyncTimer);
+                patrolLocationSyncTimer = null;
+            }
+            latestPatrolPoint = null;
         }, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
+    }
+
+    async function syncPatrolLocation() {
+        if (watchId === null || !latestPatrolPoint || patrolLocationSyncInProgress) return;
+        patrolLocationSyncInProgress = true;
+        try {
+            await data.updatePatrolLocation(latestPatrolPoint);
+            document.getElementById("estadoPatrulla").textContent =
+                `Ubicación de la unidad sincronizada ${new Date().toLocaleTimeString()}.`;
+        } catch (error) {
+            console.error("No se pudo sincronizar la ubicación de patrulla:", error);
+            document.getElementById("estadoPatrulla").textContent =
+                error.message || "No se pudo sincronizar la ubicación de patrulla.";
+            if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+            watchId = null;
+            if (patrolLocationSyncTimer !== null) {
+                window.clearTimeout(patrolLocationSyncTimer);
+                patrolLocationSyncTimer = null;
+            }
+        } finally {
+            patrolLocationSyncInProgress = false;
+            if (watchId !== null && latestPatrolPoint && patrolLocationSyncTimer === null) {
+                patrolLocationSyncTimer = window.setTimeout(() => {
+                    patrolLocationSyncTimer = null;
+                    void syncPatrolLocation();
+                }, 5000);
+            }
+        }
     }
 
     function renderMap(alerts) {
@@ -743,7 +801,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 fillColor: colorFor(alert.tipo),
                 fillOpacity: 0.95
             });
-            marker.bindPopup(`<strong>${escapeHtml(alert.tipo || "Alerta")}</strong><br>${escapeHtml(alert.estado || "Pendiente")}<br>${formatDate(alert.timestamp)}<br>${Number(alert.reportes) || 1} reporte(s)`);
+            marker.bindPopup(`<strong>${Number(alert.reportes) > 1 ? "Incidente Grupal · " : ""}${escapeHtml(alert.tipo || "Alerta")}</strong><br>${escapeHtml(alert.estado || "Pendiente")}<br>${formatDate(alert.timestamp)}<br>${Number(alert.reportes) || 1} reporte(s)`);
             marker.addTo(alertLayer);
         });
         drawPatrol(data.getPatrols());
@@ -766,9 +824,11 @@ document.addEventListener("DOMContentLoaded", function () {
         patrolLayer.clearLayers();
         patrols.filter((patrol) => Number.isFinite(Number(patrol.latitud)) &&
             Number.isFinite(Number(patrol.longitud))).forEach((patrol) => {
-            const markerColor = patrol.estado === "Despachado" || patrol.estado === "En sitio"
+            const markerColor = ["Despachado", "En sitio"].includes(patrol.estado)
                 ? "#1676d2"
-                : "#15875d";
+                : ["Disponible", "Patrullando"].includes(patrol.estado)
+                    ? "#15875d"
+                    : "#6b7280";
             L.marker([Number(patrol.latitud), Number(patrol.longitud)], {
                 icon: L.divIcon({
                     className: "central-patrol-marker",
@@ -953,7 +1013,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function isInZone(alert) {
-        if (!zone || !hasCoordinates(alert)) return true;
+        if (!zone || !hasCoordinates(alert)) return false;
         return data.distanceMeters(zone, alert) <= zone.radioMetros;
     }
 
@@ -1007,9 +1067,4 @@ document.addEventListener("DOMContentLoaded", function () {
         return Number.isFinite(date.getTime()) ? date.toLocaleString() : "Hora no disponible";
     }
 
-    function escapeHtml(value) {
-        const element = document.createElement("span");
-        element.textContent = String(value || "");
-        return element.innerHTML;
-    }
 });

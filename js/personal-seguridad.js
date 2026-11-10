@@ -1,8 +1,12 @@
 import { signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import {
-    collection, doc, onSnapshot, query, runTransaction, serverTimestamp, where
+    collection, doc, getDoc, onSnapshot, query, runTransaction, serverTimestamp, where
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
+import {
+    configurarCierreSesion,
+    escapeHtml
+} from "./general.js?v=shared-core-20261106";
 
 document.addEventListener("DOMContentLoaded", function () {
     const data = window.coalertaData;
@@ -18,8 +22,13 @@ document.addEventListener("DOMContentLoaded", function () {
     let routeLayer;
     let patrolLayer;
     let selectedIncidentId = null;
+    let displayedIncidents = [];
+    const incidentCoordinatesCache = new Map();
+    const incidentCoordinateLoads = new Map();
     let watchId = null;
-    let lastLocationSentAt = 0;
+    let locationSyncTimer = null;
+    let latestLocationPoint = null;
+    let locationSyncInProgress = false;
     let lastLocation = null;
     let dispatchProfile = null;
     let stopWatchingProfile = null;
@@ -28,6 +37,7 @@ document.addEventListener("DOMContentLoaded", function () {
     let openAlertsError = null;
     let securityLocation = null;
     let stopWatchingOpenAlerts = null;
+    let knownDispatchStates = null;
 
     if (!data) {
         setStatus("No se pudo iniciar Firebase.", "error");
@@ -38,10 +48,40 @@ document.addEventListener("DOMContentLoaded", function () {
     document.getElementById("btnActualizarSeguridad").addEventListener("click", render);
     document.getElementById("btnUbicacionUnidad").addEventListener("click", startLocationSharing);
     document.getElementById("btnDetenerUbicacion").addEventListener("click", () => stopLocationSharing(true));
-    document.getElementById("btnCerrarSesionSeguridad").addEventListener("click", closeSession);
+    configurarCierreSesion({
+        auth,
+        signOut,
+        buttonIds: ["btnCerrarSesionSeguridad"],
+        confirmationMessage: "¿Seguro que deseas cerrar sesión?",
+        clearCachedSession: true,
+        replaceLocation: true,
+        beforeSignOut: async () => {
+            window.addEventListener("beforeunload", stopOpenAlertsListener, { once: true });
+            await stopLocationSharing(true);
+        },
+        errorMessage: (error) => error.message || "No se pudo cerrar la sesión."
+    });
     incidentList.addEventListener("click", handleIncidentClick);
     window.addEventListener("coalerta:datos-listos", initializeFromProfile);
-    window.addEventListener("coalerta:incidentes-actualizados", render);
+    window.addEventListener("coalerta:incidentes-actualizados", function () {
+        const incidents = data.getIncidents();
+        const profile = data.getProfile() || {};
+        const newlyDispatchedToUnit = knownDispatchStates !== null && incidents.some((incident) =>
+            incident.estado === "Auxilio en camino" &&
+            String(incident.patrullaId || "") === String(profile.patrullaId || "") &&
+            knownDispatchStates.get(String(incident.id)) !== "Auxilio en camino"
+        );
+        knownDispatchStates = new Map(
+            incidents.map((incident) => [String(incident.id), incident.estado])
+        );
+        if (newlyDispatchedToUnit && window.coalertaSonidoEmergencia &&
+            window.coalertaSonidoEmergencia.isEnabled()) {
+            window.coalertaSonidoEmergencia.play().catch((error) => {
+                console.error("No se pudo reproducir el sonido del despacho:", error);
+            });
+        }
+        render();
+    });
     window.addEventListener("coalerta:patrullas-actualizadas", render);
     window.addEventListener("coalerta:error", function (event) {
         if (event.detail && ["perfil", "incidentes operativos"].includes(event.detail.area)) {
@@ -179,6 +219,10 @@ document.addEventListener("DOMContentLoaded", function () {
         );
         const nearbyOpenAlerts = getNearbyOpenAlerts();
         const displayedAlerts = actionable.concat(nearbyOpenAlerts);
+        displayedIncidents = displayedAlerts.map((incident) => ({
+            ...incident,
+            ...(incidentCoordinatesCache.get(String(incident.id)) || {})
+        }));
         const active = incidents.filter((incident) =>
             ["Auxilio en camino", "Agentes en sitio"].includes(incident.estado)
         );
@@ -191,16 +235,58 @@ document.addEventListener("DOMContentLoaded", function () {
             selectedIncidentId = displayedAlerts.length ? String(displayedAlerts[0].id) : null;
         }
         incidentList.replaceChildren();
-        if (!displayedAlerts.length) {
+        if (!displayedIncidents.length) {
             incidentList.append(makeEmpty(openAlertsError ||
                 "No hay alertas derivadas o asignadas para atender."));
         } else {
-            actionable.forEach((incident) => incidentList.append(createIncidentCard(incident)));
-            nearbyOpenAlerts.forEach((incident) =>
-                incidentList.append(createOpenEmergencyCard(incident))
-            );
+            const actionableIds = new Set(actionable.map((incident) => String(incident.id)));
+            displayedIncidents.forEach((incident) => incidentList.append(
+                actionableIds.has(String(incident.id))
+                    ? createIncidentCard(incident)
+                    : createOpenEmergencyCard(incident)
+            ));
         }
-        drawMap(displayedAlerts);
+        drawMap(displayedIncidents);
+        displayedIncidents.forEach((incident) => {
+            if (!hasCoordinates(incident)) {
+                void recoverIncidentCoordinates(incident).then(() => render()).catch((error) => {
+                    console.error(
+                        `No se pudieron recuperar las coordenadas del incidente ${incident.id}:`,
+                        error
+                    );
+                });
+            }
+        });
+    }
+
+    function recoverIncidentCoordinates(incident) {
+        const id = String(incident && incident.id || "");
+        if (!id) return Promise.reject(new Error("El incidente no tiene identificador."));
+        const cached = incidentCoordinatesCache.get(id);
+        if (cached) return Promise.resolve({ ...incident, ...cached });
+        const pending = incidentCoordinateLoads.get(id);
+        if (pending) return pending.then((coordinates) => ({ ...incident, ...coordinates }));
+
+        const load = getDoc(doc(db, "incidentes", id)).then((snapshot) => {
+            if (!snapshot.exists()) {
+                throw new Error("No se encontró el documento del incidente en Firestore.");
+            }
+            const storedIncident = snapshot.data();
+            const location = storedIncident.ubicacion || {};
+            const coordinates = {
+                latitud: Number(storedIncident.latitud ?? location.lat ?? location.latitude),
+                longitud: Number(storedIncident.longitud ?? location.lng ?? location.longitude)
+            };
+            if (!validPoint(coordinates)) {
+                throw new Error("No se encontraron coordenadas válidas para el incidente.");
+            }
+            incidentCoordinatesCache.set(id, coordinates);
+            return coordinates;
+        }).finally(() => {
+            incidentCoordinateLoads.delete(id);
+        });
+        incidentCoordinateLoads.set(id, load);
+        return load.then((coordinates) => ({ ...incident, ...coordinates }));
     }
 
     function watchOpenAlerts() {
@@ -218,10 +304,16 @@ document.addEventListener("DOMContentLoaded", function () {
                 const timestamp = incident.timestamp && typeof incident.timestamp.toDate === "function"
                     ? incident.timestamp.toDate().toISOString()
                     : incident.timestamp;
+                const tipoPorCategoria = {
+                    robo: "Robo",
+                    sospecha: "Sospecha",
+                    accidente: "Accidente",
+                    incendio: "Incendio"
+                };
                 return {
                     ...incident,
                     id: document.id,
-                    tipo: "Emergencia inmediata",
+                    tipo: tipoPorCategoria[incident.categoria] || "Emergencia inmediata",
                     latitud: Number(point.lat),
                     longitud: Number(point.lng),
                     estado: "pendiente",
@@ -289,11 +381,17 @@ document.addEventListener("DOMContentLoaded", function () {
         icon.className = "seguridad-alert-icon";
         icon.style.backgroundColor = "#b42318";
         const iconElement = document.createElement("i");
-        iconElement.className = "fa-solid fa-triangle-exclamation";
+        const iconByCategory = {
+            robo: "fa-mask-face",
+            sospecha: "fa-user-secret",
+            accidente: "fa-truck-medical",
+            incendio: "fa-fire"
+        };
+        iconElement.className = `fa-solid ${iconByCategory[incident.categoria] || "fa-triangle-exclamation"}`;
         iconElement.setAttribute("aria-hidden", "true");
         icon.append(iconElement);
         const title = document.createElement("strong");
-        title.textContent = "Emergencia inmediata";
+        title.textContent = incident.tipo || "Emergencia inmediata";
         identity.append(icon, title);
         const state = document.createElement("span");
         state.className = "seguridad-alert-state";
@@ -306,6 +404,9 @@ document.addEventListener("DOMContentLoaded", function () {
         });
         summary.textContent =
             `Reporte inmediato · a ${(distance / 1000).toLocaleString("es", { maximumFractionDigits: 1 })} km`;
+        if (incident.detalle) {
+            summary.textContent += ` · ${incident.detalle}`;
+        }
         select.append(heading, summary);
 
         const actions = document.createElement("div");
@@ -351,20 +452,21 @@ document.addEventListener("DOMContentLoaded", function () {
         iconElement.setAttribute("aria-hidden", "true");
         icon.append(iconElement);
         const title = document.createElement("strong");
-        title.textContent = `${incident.tipo || "Alerta"}${Number(incident.reportes) > 1 ? ` · ${incident.reportes} reportes` : ""}`;
+        title.textContent = `${Number(incident.reportes) > 1 ? "Incidente Grupal · " : ""}${incident.tipo || "Alerta"}${Number(incident.reportes) > 1 ? ` · ${incident.reportes} reportes` : ""}`;
         identity.append(icon, title);
         const state = document.createElement("span");
         state.className = "seguridad-alert-state";
         state.textContent = incident.estado;
         heading.append(identity, state);
         const summary = document.createElement("p");
-        summary.textContent = `${incident.detalle || "Sin detalle adicional"} · ${incident.ubicacion || "Ubicación no disponible"}`;
+        summary.textContent =
+            `${incident.detalle || "Sin detalle adicional"} · ${getIncidentLocationLabel(incident)}`;
         select.append(heading, summary);
 
         const actions = document.createElement("div");
         actions.className = "seguridad-card-actions";
         if (incident.estado === "Derivada a Central") {
-            const dispatchButton = makeButton("dispatch", "Despachar unidad");
+            const dispatchButton = makeButton("dispatch", "EN CAMINO");
             const dispatchStatus = getDispatchEligibility();
             dispatchButton.disabled = !dispatchStatus.allowed;
             dispatchButton.title = dispatchButton.disabled
@@ -372,18 +474,21 @@ document.addEventListener("DOMContentLoaded", function () {
                 : "Despachar la unidad asignada a esta alerta.";
             actions.append(dispatchButton);
         } else if (incident.estado === "Auxilio en camino") {
-            actions.append(makeButton("onsite", "Marcar llegada"));
+            const arrivalButton = makeButton("onsite", "Marcar llegada");
+            const arrival = getArrivalEligibility(incident);
+            arrivalButton.disabled = !arrival.allowed;
+            arrivalButton.title = arrival.message;
+            actions.append(arrivalButton);
         } else if (incident.estado === "Agentes en sitio") {
             const outcome = document.createElement("select");
             outcome.dataset.outcomeFor = String(incident.id);
             outcome.setAttribute("aria-label", "Resultado del incidente");
             [
-                ["Persona detenida", "Persona detenida"],
+                ["Delincuente retenido", "Delincuente retenido"],
                 ["Falsa alarma", "Falsa alarma"],
-                ["Intervención preventiva", "Intervención preventiva"],
-                ["Sin novedad", "Sin novedad"]
+                ["Intervención preventiva", "Intervención preventiva"]
             ].forEach(([value, label]) => outcome.add(new Option(label, value)));
-            actions.append(outcome, makeButton("close", "Cerrar incidente"));
+            actions.append(outcome, makeButton("close", "Finalizar / Incidente Atendido"));
         }
         if (hasCoordinates(incident)) actions.append(makeButton("route", "Calcular ruta"));
         card.append(select, actions);
@@ -413,12 +518,23 @@ document.addEventListener("DOMContentLoaded", function () {
         if (!incidentId) return;
         button.disabled = true;
         try {
-            const incident = data.getIncidents().find((item) => String(item.id) === incidentId) ||
-                getNearbyOpenAlerts().find((item) => String(item.id) === incidentId);
+            let incident = displayedIncidents.find((item) => String(item.id) === incidentId);
             if (!incident) throw new Error("No se encontró el incidente seleccionado.");
+            if (!hasCoordinates(incident)) {
+                incident = await recoverIncidentCoordinates(incident);
+                incidentCoordinatesCache.set(incidentId, {
+                    latitud: Number(incident.latitud),
+                    longitud: Number(incident.longitud)
+                });
+                render();
+            }
             if (button.dataset.action === "dispatch") {
                 const dispatchStatus = getDispatchEligibility();
                 if (!dispatchStatus.allowed) throw new Error(dispatchStatus.message);
+            }
+            if (button.dataset.action === "onsite") {
+                const arrival = getArrivalEligibility(incident);
+                if (!arrival.allowed) throw new Error(arrival.message);
             }
             if (button.dataset.action === "route") {
                 await showRoute(incident);
@@ -435,6 +551,14 @@ document.addEventListener("DOMContentLoaded", function () {
                 await data.transitionIncident(incidentId, button.dataset.action);
             }
             render();
+            if (button.dataset.action === "dispatch") {
+                try {
+                    await showRoute(incident);
+                } catch (routeError) {
+                    console.error("El despacho se registró, pero no se pudo calcular la ruta:", routeError);
+                    window.alert(`Despacho registrado, pero no se pudo trazar la ruta: ${routeError.message}`);
+                }
+            }
         } catch (error) {
             console.error("No se pudo actualizar el incidente:", error);
             window.alert(error.message || "No se pudo actualizar el incidente.");
@@ -489,9 +613,28 @@ document.addEventListener("DOMContentLoaded", function () {
             selectedDetails.textContent = "Selecciona una alerta de la cola.";
             return;
         }
+        const profile = data.getProfile() || {};
+        const patrol = data.getPatrols().find((item) =>
+            String(item.id) === String(profile.patrullaId || "")
+        );
+        const origin = patrol && validPoint(patrol) ? patrol : securityLocation;
+        const approximateAddress = typeof incident.direccionAproximada === "string" &&
+            incident.direccionAproximada.trim()
+            ? incident.direccionAproximada.trim()
+            : typeof incident.ubicacion === "string" && incident.ubicacion.trim()
+                ? incident.ubicacion.trim()
+                : hasCoordinates(incident)
+                    ? `Referencia GPS aproximada: ${Number(incident.latitud).toFixed(5)}, ${Number(incident.longitud).toFixed(5)}`
+                    : "Dirección aproximada no disponible";
+        const distance = origin && validPoint(origin) && hasCoordinates(incident)
+            ? `${Math.round(data.distanceMeters(origin, {
+                latitud: Number(incident.latitud),
+                longitud: Number(incident.longitud)
+            }))} m`
+            : "No disponible";
         selectedDetails.textContent =
-            `${incident.tipo || "Alerta"} · ${incident.estado} · ${incident.ubicacion || "Ubicación no disponible"}` +
-            (hasCoordinates(incident) ? ` · ${Number(incident.latitud).toFixed(5)}, ${Number(incident.longitud).toFixed(5)}` : "");
+            `Tipo de evento: ${incident.tipo || "Alerta"} · Estado: ${incident.estado} · ` +
+            `Dirección aproximada: ${approximateAddress} · Distancia actual: ${distance}`;
     }
 
     async function showRoute(incident) {
@@ -536,22 +679,90 @@ document.addEventListener("DOMContentLoaded", function () {
         if (!window.confirm("Se enviarán las coordenadas de la unidad y la alerta al servicio público OSRM para calcular la ruta. ¿Deseas continuar?")) return;
         const coordinates = `${Number(origin.longitud)},${Number(origin.latitud)};${Number(incident.longitud)},${Number(incident.latitud)}`;
         const response = await fetch(
-            `https://router.project-osrm.org/route/v1/driving/${coordinates}?overview=full&geometries=geojson`,
+            `https://router.project-osrm.org/route/v1/driving/${coordinates}?overview=full&geometries=geojson&alternatives=true`,
             { headers: { Accept: "application/json" } }
         );
         if (!response.ok) throw new Error("El servicio de rutas no está disponible. Inténtalo nuevamente.");
         const result = await response.json();
-        const route = result.routes && result.routes[0];
+        const routes = Array.isArray(result.routes) ? result.routes : [];
+        const route = routes.reduce((shortest, candidate) =>
+            !shortest || candidate.distance < shortest.distance ? candidate : shortest, null
+        );
         if (!route || !route.geometry) throw new Error("No se encontró una ruta vial.");
         routeLayer.clearLayers();
         const line = L.geoJSON(route.geometry, {
             style: { color: "#1267d6", weight: 6, opacity: .85 }
         }).addTo(routeLayer);
         map.fitBounds(line.getBounds(), { padding: [30, 30] });
-        routeStatus.textContent =
-            `Ruta desde ${origin.codigo || origin.codigoPatrulla || "la unidad"}: ` +
-            `${(route.distance / 1000).toLocaleString("es", { maximumFractionDigits: 1 })} km · ` +
-            `${Math.max(1, Math.ceil(route.duration / 60))} min estimados.`;
+        const navigationUrl = new URL("https://www.google.com/maps/dir/");
+        navigationUrl.searchParams.set("api", "1");
+        navigationUrl.searchParams.set("origin", `${origin.latitud},${origin.longitud}`);
+        navigationUrl.searchParams.set("destination", `${incident.latitud},${incident.longitud}`);
+        navigationUrl.searchParams.set("travelmode", "driving");
+        navigationUrl.searchParams.set("dir_action", "navigate");
+        navigationUrl.searchParams.set("traffic", "1");
+        const navigationLink = document.createElement("a");
+        navigationLink.href = navigationUrl.toString();
+        navigationLink.target = "_blank";
+        navigationLink.rel = "noopener noreferrer";
+        navigationLink.className = "seguridad-google-maps-link";
+        navigationLink.textContent = "Abrir navegación en Google Maps ↗";
+        routeStatus.replaceChildren(
+            document.createTextNode(
+                `Ruta vial más corta entre las alternativas de OSRM desde ${origin.codigo || origin.codigoPatrulla || "la unidad"}: ` +
+                `${(route.distance / 1000).toLocaleString("es", { maximumFractionDigits: 1 })} km · ` +
+                `${Math.max(1, Math.ceil(route.duration / 60))} min estimados. `
+            ),
+            navigationLink
+        );
+    }
+
+    function getArrivalEligibility(incident) {
+        if (!hasCoordinates(incident)) {
+            return {
+                allowed: false,
+                message: "No se cargaron las coordenadas del incidente. Actualiza la lista para recuperarlas."
+            };
+        }
+        const now = Date.now();
+        const profile = data.getProfile() || {};
+        const patrolId = String(incident.patrullaId || profile.patrullaId || "");
+        const patrol = data.getPatrols().find((item) => String(item.id) === patrolId);
+        const localPointIsFresh = latestLocationPoint &&
+            Number.isFinite(latestLocationPoint.receivedAt) &&
+            now - latestLocationPoint.receivedAt <= 15000;
+        const patrolUpdatedAt = getTimestampMillis(patrol && patrol.updatedAt);
+        const patrolPointIsFresh = patrol && patrol.estado === "Despachado" &&
+            String(patrol.incidenteId || "") === String(incident.id) &&
+            Number.isFinite(patrolUpdatedAt) &&
+            patrolUpdatedAt <= now &&
+            now - patrolUpdatedAt <= 2 * 60 * 1000;
+        const point = localPointIsFresh
+            ? latestLocationPoint
+            : patrolPointIsFresh
+                ? {
+                    latitud: Number(patrol.latitud),
+                    longitud: Number(patrol.longitud),
+                    precisionMetros: Number(patrol.precisionMetros),
+                    receivedAt: patrolUpdatedAt
+                }
+                : null;
+        if (!point || !validPoint(point) || !Number.isFinite(Number(point.precisionMetros)) ||
+            Number(point.precisionMetros) >= 15 ||
+            !Number.isFinite(point.receivedAt) || now - point.receivedAt > 2 * 60 * 1000) {
+            return {
+                allowed: false,
+                message: "No hay una ubicación GPS de la unidad reciente y precisa. Activa el GPS y espera una lectura con precisión menor a 15 m."
+            };
+        }
+        const distance = data.distanceMeters(point, incident);
+        if (distance >= 15) {
+            return {
+                allowed: false,
+                message: `Acércate a menos de 15 m del emisor para marcar llegada (distancia actual: ${Math.round(distance)} m).`
+            };
+        }
+        return { allowed: true, message: "Unidad a menos de 15 m del emisor." };
     }
 
     function startLocationSharing() {
@@ -560,36 +771,16 @@ document.addEventListener("DOMContentLoaded", function () {
             return;
         }
         if (watchId !== null) return;
-        watchId = navigator.geolocation.watchPosition(async (position) => {
-            const point = {
+        watchId = navigator.geolocation.watchPosition((position) => {
+            latestLocationPoint = {
                 latitud: position.coords.latitude,
                 longitud: position.coords.longitude,
-                precisionMetros: Math.max(1, position.coords.accuracy)
+                precisionMetros: Math.max(1, position.coords.accuracy),
+                receivedAt: Date.now()
             };
-            securityLocation = point;
+            securityLocation = latestLocationPoint;
             render();
-            const movedEnough = !lastLocation ||
-                data.distanceMeters(lastLocation, point) >= 25;
-            if (!movedEnough && Date.now() - lastLocationSentAt < 15000) return;
-            let stage = "actualizar la ubicación de serenazgo";
-            try {
-                const profile = await data.refreshCurrentProfile();
-                if (data.getRole() === "seguridad" && profile.comunidadId && !profile.patrullaId) {
-                    await data.updateSecurityLocation(point);
-                }
-                if (profile.patrullaId) {
-                    stage = "actualizar la ubicación de la unidad y habilitar el despacho";
-                    await data.updatePatrolLocation(point);
-                }
-                lastLocation = point;
-                lastLocationSentAt = Date.now();
-                locationStatus.textContent =
-                    `Ubicación actualizada · precisión ±${Math.round(position.coords.accuracy)} m.`;
-                render();
-            } catch (error) {
-                console.error(`No se pudo ${stage}:`, error);
-                locationStatus.textContent = `${stage}: ${error.message || "permiso denegado por Firestore."}`;
-            }
+            if (!locationSyncInProgress) void syncLatestLocation();
         }, (error) => {
             console.error("No se pudo obtener la ubicación de la unidad:", error);
             locationStatus.textContent = error.code === 1
@@ -602,9 +793,47 @@ document.addEventListener("DOMContentLoaded", function () {
         locationStatus.textContent = "Obteniendo ubicación GPS de la unidad…";
     }
 
+    async function syncLatestLocation() {
+        if (watchId === null || !latestLocationPoint || locationSyncInProgress) return;
+        locationSyncInProgress = true;
+        let stage = "actualizar la ubicación de serenazgo";
+        try {
+            const point = latestLocationPoint;
+            const profile = data.getProfile();
+            if (!profile) throw new Error("No se encontró el perfil de seguridad para sincronizar la ubicación.");
+            if (data.getRole() === "seguridad" && profile.comunidadId && !profile.patrullaId) {
+                await data.updateSecurityLocation(point);
+            }
+            if (profile.patrullaId) {
+                stage = "actualizar la ubicación de la unidad y habilitar el despacho";
+                await data.updatePatrolLocation(point);
+            }
+            lastLocation = point;
+            locationStatus.textContent =
+                `Ubicación actualizada · precisión ±${Math.round(point.precisionMetros)} m.`;
+            render();
+        } catch (error) {
+            console.error(`No se pudo ${stage}:`, error);
+            locationStatus.textContent = `${stage}: ${error.message || "permiso denegado por Firestore."}`;
+        } finally {
+            locationSyncInProgress = false;
+            if (watchId !== null && latestLocationPoint && locationSyncTimer === null) {
+                locationSyncTimer = window.setTimeout(() => {
+                    locationSyncTimer = null;
+                    void syncLatestLocation();
+                }, 5000);
+            }
+        }
+    }
+
     async function stopLocationSharing(clearRemote = true) {
         if (watchId !== null && navigator.geolocation) navigator.geolocation.clearWatch(watchId);
         watchId = null;
+        if (locationSyncTimer !== null) {
+            window.clearTimeout(locationSyncTimer);
+            locationSyncTimer = null;
+        }
+        latestLocationPoint = null;
         if (clearRemote && lastLocation && data.isReady() &&
             ["seguridad", "agente"].includes(data.getRole())) {
             try {
@@ -627,29 +856,23 @@ document.addEventListener("DOMContentLoaded", function () {
         if (locationStatus) locationStatus.textContent = "La ubicación no se está compartiendo.";
     }
 
-    async function closeSession() {
-        if (!window.confirm("¿Seguro que deseas cerrar sesión?")) return;
-        try {
-            await stopLocationSharing(true);
-            await signOut(auth);
-            localStorage.removeItem("coalerta_usuario");
-            localStorage.removeItem("coalertaSesion");
-            window.location.replace("login.html");
-        } catch (error) {
-            console.error("No se pudo cerrar la sesión:", error);
-            window.alert(error.message || "No se pudo cerrar la sesión.");
-        }
-
-        function stopOpenAlertsListener() {
-            if (stopWatchingOpenAlerts) stopWatchingOpenAlerts();
-            stopWatchingOpenAlerts = null;
-        }
-
-        window.addEventListener("beforeunload", stopOpenAlertsListener, { once: true });
+    function stopOpenAlertsListener() {
+        if (stopWatchingOpenAlerts) stopWatchingOpenAlerts();
+        stopWatchingOpenAlerts = null;
     }
 
     function hasCoordinates(incident) {
         return validPoint(incident);
+    }
+
+    function getIncidentLocationLabel(incident) {
+        if (typeof incident.ubicacion === "string" && incident.ubicacion.trim()) {
+            return incident.ubicacion.trim();
+        }
+        if (hasCoordinates(incident)) {
+            return `Referencia GPS: ${Number(incident.latitud).toFixed(5)}, ${Number(incident.longitud).toFixed(5)}`;
+        }
+        return "Ubicación no disponible";
     }
 
     function getDispatchEligibility() {
@@ -744,12 +967,6 @@ document.addEventListener("DOMContentLoaded", function () {
             Number.isFinite(Number(point.longitud)) &&
             Number(point.latitud) >= -90 && Number(point.latitud) <= 90 &&
             Number(point.longitud) >= -180 && Number(point.longitud) <= 180;
-    }
-
-    function escapeHtml(value) {
-        return String(value).replace(/[&<>"']/g, (character) => ({
-            "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
-        })[character]);
     }
 
     function makeEmpty(text) {

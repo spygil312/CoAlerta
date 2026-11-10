@@ -2,10 +2,12 @@ import {
     onAuthStateChanged, signOut
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { auth } from "./firebase-config.js?v=spark-direct-firestore-1";
+import {
+    configurarCierreSesion,
+    escapeHtml,
+    formatearRolVisible
+} from "./general.js?v=shared-core-20261106";
 
-/* =========================================================
-   COALERTA - MAPA.JS
-========================================================= */
 let ubicacionActualMapa = null;
 let comunidadActualMapa = null;
 let solicitudUbicacionMapa = false;
@@ -56,7 +58,12 @@ document.addEventListener("DOMContentLoaded", function () {
     cargarAlertasGuardadas();
     configurarFiltrosMapa();
     configurarPerfilSidebar();
-    configurarCierreSesion();
+    configurarCierreSesion({
+        auth,
+        signOut,
+        confirmationMessage: "¿Seguro que deseas cerrar sesión?",
+        clearCachedSession: true
+    });
     configurarModalEmergencia();
     configurarCentradoAlertas();
     configurarPeriodoMapa();
@@ -334,8 +341,14 @@ function agregarMarcadorAlerta(alerta) {
         return null;
     }
 
+    const categoriasEmergencia = {
+        robo: "Robo",
+        sospecha: "Sospecha",
+        accidente: "Accidente",
+        incendio: "Incendio"
+    };
     const tipo = alerta.tipo === "alerta_abierta"
-        ? "Emergencia inmediata"
+        ? categoriasEmergencia[alerta.categoria] || "Emergencia inmediata"
         : alerta.tipo || "Alerta";
     const tipoClase = normalizarTipoMapa(tipo);
     const marcador = L.marker([latitud, longitud], {
@@ -344,10 +357,11 @@ function agregarMarcadorAlerta(alerta) {
 
     marcador.bindPopup(`
         <div class="popup-coalerta">
-            <strong>${escaparTexto(tipo)}</strong><br>
-            <span>${escaparTexto(alerta.ubicacion || "Ubicación registrada")}</span><br><br>
-            <b>Estado:</b> ${escaparTexto(alerta.estado || "Activa")}<br>
-            <b>Hora:</b> ${escaparTexto(alerta.hora || formatTime(alerta.timestamp))}
+            <strong>${escapeHtml(tipo)}</strong><br>
+            <span>${escapeHtml(alerta.ubicacion || "Ubicación registrada")}</span><br><br>
+            ${alerta.detalle ? `<span>${escapeHtml(alerta.detalle)}</span><br><br>` : ""}
+            <b>Estado:</b> ${escapeHtml(alerta.estado || "Activa")}<br>
+            <b>Hora:</b> ${escapeHtml(alerta.hora || formatTime(alerta.timestamp))}
         </div>
     `);
     window.marcadoresAlertas.push({
@@ -452,6 +466,8 @@ function cargarAlertasGuardadas() {
     const ownAlerts = data ? data.getMyAlerts() : [];
     const ownAlertIds = new Set(ownAlerts.map((alerta) => String(alerta.id)));
     const alerts = new Map((data ? data.getAlerts() : []).map((alerta) => [String(alerta.id), alerta]));
+    const now = Date.now();
+    const recentAlertCutoff = now - 60 * 60 * 1000;
     ownAlerts.forEach((alerta) => {
         const id = String(alerta.id);
         alerts.set(id, {
@@ -463,6 +479,8 @@ function cargarAlertasGuardadas() {
     });
     const activas = Array.from(alerts.values()).filter((alerta) => {
         if (["Descartada", "Emergencia Concluida"].includes(alerta.estado)) return false;
+        const timestamp = new Date(alerta.timestamp || 0).getTime();
+        if (!Number.isFinite(timestamp) || timestamp < recentAlertCutoff || timestamp > now) return false;
         const ownAlert = ownAlertIds.has(String(alerta.id));
         if (communityId) {
             if (alerta.comunidadId !== communityId) return false;
@@ -627,7 +645,7 @@ function configurarPerfilSidebar(profileOverride) {
     const nombreElemento = document.getElementById("sidebarNombre");
     const rolElemento = document.getElementById("sidebarRol");
     if (nombreElemento) nombreElemento.textContent = `Hola, ${nombre.trim().split(/\s+/)[0]}`;
-    if (rolElemento) rolElemento.textContent = formatearRolVisibleMapa(usuario);
+    if (rolElemento) rolElemento.textContent = formatearRolVisible(usuario);
     const avatar = document.getElementById("sidebarAvatarImg");
     const icono = document.getElementById("sidebarAvatarIcon");
     const foto = usuario.fotoBase64 || usuario.fotoURL || usuario.photoURL;
@@ -644,55 +662,6 @@ function configurarPerfilSidebar(profileOverride) {
         if (icono) icono.hidden = false;
     }
 
-    function formatearRolVisibleMapa(usuario) {
-        const valor = String(usuario.rol || "vecino").trim();
-        const normalizado = valor.toLocaleLowerCase();
-        const roleLabels = {
-            vecino: "Vecino",
-            residente: "Vecino",
-            coordinador: "Coordinador vecinal",
-            seguridad: "Personal de seguridad",
-            agente: "Personal de seguridad"
-        };
-        const rol = roleLabels[normalizado] ||
-            (["vecino / residente", "vecino/residente"].includes(normalizado)
-                ? "Vecino"
-                : valor.charAt(0).toLocaleUpperCase() + valor.slice(1));
-        if (normalizado === "vecino" && usuario.estadoSolicitudRol === "pendiente" && usuario.rolSolicitud) {
-            return `${formatearRolSolicitado(usuario.rolSolicitud)} (pendiente)`;
-        }
-        return rol;
-    }
-
-    function formatearRolSolicitado(rol) {
-        const roles = {
-            coordinador: "Coordinador vecinal",
-            seguridad: "Personal de seguridad"
-        };
-        const normalizado = String(rol || "").toLowerCase();
-        return roles[normalizado] || String(rol || "rol").trim();
-    }
-}
-
-function configurarCierreSesion() {
-    const boton = document.getElementById("btnCerrarSesionLateral");
-    if (!boton) return;
-
-    boton.addEventListener("click", async function (evento) {
-        evento.preventDefault();
-        if (!confirm("¿Seguro que deseas cerrar sesión?")) return;
-        try {
-            if (typeof auth !== "undefined" && auth.currentUser) {
-                await signOut(auth);
-            }
-            localStorage.removeItem("coalerta_usuario");
-            localStorage.removeItem("coalertaSesion");
-            window.location.href = "login.html";
-        } catch (error) {
-            console.error("No se pudo cerrar la sesión:", error);
-            alert("No se pudo cerrar la sesión. Inténtalo nuevamente.");
-        }
-    });
 }
 
 function configurarModalEmergencia() {
@@ -700,7 +669,12 @@ function configurarModalEmergencia() {
     const botonAbrir = document.getElementById("btnEmergencia");
     const botonMobile = document.getElementById("btnEmergenciaMobile");
     const botonCerrar = document.getElementById("cerrarModal");
-    const cerrar = () => modal && modal.classList.remove("mostrar");
+    const cerrar = () => {
+        if (typeof window.cancelAlertCountdown === "function") {
+            window.cancelAlertCountdown();
+        }
+        if (modal) modal.classList.remove("mostrar");
+    };
     const abrir = () => {
         if (typeof window.resetAlertModal === "function") window.resetAlertModal();
         if (modal) modal.classList.add("mostrar");
@@ -768,14 +742,4 @@ function actualizarContadorUnidades() {
 function formatTime(timestamp) {
     const date = new Date(timestamp || 0);
     return Number.isFinite(date.getTime()) ? date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—";
-}
-
-function escaparTexto(valor) {
-    return String(valor).replace(/[&<>"']/g, (caracter) => ({
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&#39;"
-    })[caracter]);
 }

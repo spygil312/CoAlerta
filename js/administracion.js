@@ -1,7 +1,7 @@
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import {
-    collection, doc, getDoc, getDocs, onSnapshot, query,
-    runTransaction, serverTimestamp, updateDoc, writeBatch, where
+    collection, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query,
+    runTransaction, serverTimestamp, Timestamp, updateDoc, where
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
 
@@ -16,12 +16,21 @@ const asignacionesPanel = document.getElementById("panelAsignacionUnidades");
 const listaAsignaciones = document.getElementById("listaAsignacionUnidades");
 const estadoUnidades = document.getElementById("estadoUnidades");
 const botonInicializarUnidades = document.getElementById("inicializarUnidades");
+const slaPanel = document.getElementById("panelMetricasSla");
+const slaAverage = document.getElementById("slaPromedioGeneral");
+const slaSampleCount = document.getElementById("slaCantidadMuestras");
+const slaCommunities = document.getElementById("slaComunidades");
+const slaStatus = document.getElementById("slaActualizacion");
+const SLA_DAILY_LIMIT = 500;
 let stopWatchingRequests = null;
 let stopWatchingSecurityStaff = null;
 let stopWatchingUnits = null;
+let stopWatchingSla = null;
+let slaRefreshTimer = null;
 let adminClaimVerified = false;
 let securityStaff = [];
 let units = [];
+let dailyIncidents = [];
 
 if (aviso && panel && lista && cantidad && botonActualizar) {
     onAuthStateChanged(auth, async (user) => {
@@ -30,6 +39,7 @@ if (aviso && panel && lista && cantidad && botonActualizar) {
             stopAdminListeners();
             panel.hidden = true;
             if (asignacionesPanel) asignacionesPanel.hidden = true;
+            if (slaPanel) slaPanel.hidden = true;
             botonActualizar.disabled = true;
             if (botonInicializarUnidades) botonInicializarUnidades.disabled = true;
             setNotice("No tienes autorización para acceder a este panel.", "error");
@@ -65,14 +75,19 @@ if (aviso && panel && lista && cantidad && botonActualizar) {
             adminClaimVerified = true;
             panel.hidden = false;
             if (asignacionesPanel) asignacionesPanel.hidden = false;
+            if (slaPanel) slaPanel.hidden = false;
             botonActualizar.disabled = false;
             if (botonInicializarUnidades) botonInicializarUnidades.disabled = false;
             loadRequests();
             loadUnitAssignments();
+            loadDailySla();
+            scheduleSlaRefresh();
         } catch (error) {
             console.error("No se pudo habilitar la cuenta administradora:", error);
+            stopAdminListeners();
             panel.hidden = true;
             if (asignacionesPanel) asignacionesPanel.hidden = true;
+            if (slaPanel) slaPanel.hidden = true;
             setNotice(error.message || getErrorMessage(error), "error");
         }
     });
@@ -84,12 +99,124 @@ if (aviso && panel && lista && cantidad && botonActualizar) {
 }
 
 function stopAdminListeners() {
-    [stopWatchingRequests, stopWatchingSecurityStaff, stopWatchingUnits].forEach((stop) => {
+    [stopWatchingRequests, stopWatchingSecurityStaff, stopWatchingUnits, stopWatchingSla].forEach((stop) => {
         if (stop) stop();
     });
     stopWatchingRequests = null;
     stopWatchingSecurityStaff = null;
     stopWatchingUnits = null;
+    stopWatchingSla = null;
+    if (slaRefreshTimer !== null) window.clearTimeout(slaRefreshTimer);
+    slaRefreshTimer = null;
+    dailyIncidents = [];
+}
+
+function loadDailySla() {
+    if (!adminClaimVerified || !auth.currentUser || !slaPanel || !slaAverage ||
+        !slaSampleCount || !slaCommunities || !slaStatus) return;
+    if (stopWatchingSla) stopWatchingSla();
+
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfNextDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    slaStatus.textContent = `Sincronizando incidentes de hoy (máximo ${SLA_DAILY_LIMIT})…`;
+    stopWatchingSla = onSnapshot(query(
+        collection(db, "incidentes"),
+        where("timestamp", ">=", Timestamp.fromDate(startOfDay)),
+        where("timestamp", "<", Timestamp.fromDate(startOfNextDay)),
+        orderBy("timestamp", "desc"),
+        limit(SLA_DAILY_LIMIT)
+    ), (snapshot) => {
+        dailyIncidents = snapshot.docs.map((incident) => ({
+            id: incident.id,
+            ...incident.data()
+        }));
+        renderDailySla();
+        slaStatus.textContent = snapshot.size === SLA_DAILY_LIMIT
+            ? `Datos del día en curso; se muestran hasta ${SLA_DAILY_LIMIT} incidentes.`
+            : "Datos del día en curso; el panel se actualiza automáticamente y no descarga otras colecciones.";
+    }, (error) => {
+        console.error("No se pudieron sincronizar las métricas SLA:", error);
+        slaStatus.textContent = `No se pudieron cargar las métricas SLA: ${getErrorMessage(error)}`;
+        slaAverage.textContent = "—";
+        slaSampleCount.textContent = "Datos no disponibles";
+        slaCommunities.replaceChildren(createEmptyState("No se pudieron cargar los incidentes del día."));
+    });
+}
+
+function renderDailySla() {
+    if (!slaAverage || !slaSampleCount || !slaCommunities) return;
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const startOfNextDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime();
+    const samples = dailyIncidents.map((incident) => {
+        const createdAt = getTimestamp(incident.createdAt || incident.timestamp);
+        const arrivedAt = getTimestamp(incident.enSitioAt);
+        if (!Number.isFinite(createdAt) || !Number.isFinite(arrivedAt) ||
+            createdAt < startOfDay || createdAt >= startOfNextDay || arrivedAt < createdAt) {
+            return null;
+        }
+        return {
+            communityId: String(incident.comunidadId || "").trim() || "Sin comunidad asignada",
+            minutes: (arrivedAt - createdAt) / 60000
+        };
+    }).filter(Boolean);
+
+    if (!samples.length) {
+        slaAverage.textContent = "—";
+        slaSampleCount.textContent = "Sin llegadas registradas hoy";
+        slaCommunities.replaceChildren(createEmptyState("No hay incidentes con llegada registrada hoy."));
+        return;
+    }
+
+    slaAverage.textContent = `${(samples.reduce((total, sample) => total + sample.minutes, 0) /
+        samples.length).toFixed(1)} min`;
+    slaSampleCount.textContent = `${samples.length} incidente(s) con llegada`;
+    const communities = new Map();
+    samples.forEach((sample) => {
+        if (!communities.has(sample.communityId)) communities.set(sample.communityId, []);
+        communities.get(sample.communityId).push(sample.minutes);
+    });
+    const averages = Array.from(communities, ([communityId, values]) => ({
+        communityId,
+        count: values.length,
+        minutes: values.reduce((total, value) => total + value, 0) / values.length
+    })).sort((first, second) => first.minutes - second.minutes);
+    const maxMinutes = Math.max(...averages.map((community) => community.minutes), 1);
+    slaCommunities.replaceChildren(...averages.map((community) => {
+        const row = document.createElement("div");
+        row.className = "administracion-sla-fila";
+        row.setAttribute("role", "listitem");
+        const label = document.createElement("span");
+        label.className = "administracion-sla-etiqueta";
+        label.textContent = `Comunidad ${community.communityId}`;
+        const track = document.createElement("span");
+        track.className = "administracion-sla-pista";
+        const bar = document.createElement("span");
+        bar.className = "administracion-sla-barra";
+        bar.style.width = `${Math.max(4, community.minutes / maxMinutes * 100)}%`;
+        bar.setAttribute("aria-hidden", "true");
+        track.append(bar);
+        const value = document.createElement("strong");
+        value.textContent = `${community.minutes.toFixed(1)} min · n=${community.count}`;
+        row.append(label, track, value);
+        return row;
+    }));
+}
+
+function scheduleSlaRefresh() {
+    if (slaRefreshTimer !== null) window.clearTimeout(slaRefreshTimer);
+    const now = new Date();
+    const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime();
+    slaRefreshTimer = window.setTimeout(() => {
+        slaRefreshTimer = null;
+        if (adminClaimVerified) {
+            dailyIncidents = [];
+            renderDailySla();
+            loadDailySla();
+            scheduleSlaRefresh();
+        }
+    }, Math.max(1000, nextMidnight - Date.now() + 50));
 }
 
 function loadRequests() {

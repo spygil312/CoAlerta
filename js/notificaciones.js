@@ -1,6 +1,3 @@
-/* =========================================================
-   COALERTA - ALERTAS CERCANAS EN LA CAMPANA
-========================================================= */
 window.coalertaClaveAlerta = function (alerta) {
     if (alerta && alerta.id !== undefined && alerta.id !== null) {
         return `id:${String(alerta.id)}`;
@@ -38,7 +35,13 @@ window.coalertaSonidoEmergencia = (function () {
     }
 
     function unlock() {
-        const context = getAudioContext();
+        let context;
+        try {
+            context = getAudioContext();
+        } catch (error) {
+            console.warn("El navegador no permitió activar el sonido de alertas:", error);
+            return Promise.resolve(false);
+        }
         if (!context || context.state === "running") return Promise.resolve(Boolean(context));
         return context.resume().then(() => context.state === "running").catch((error) => {
             console.warn("El navegador no permitió activar el sonido de alertas:", error);
@@ -119,6 +122,7 @@ document.addEventListener("DOMContentLoaded", function () {
     let intentoUbicacionRealizado = false;
     let alertSnapshotReady = false;
     let noticeSnapshotReady = false;
+    let notificationExpiryTimer = null;
     let knownAlertIds = new Set();
     let knownNoticeIds = new Set();
     const pendingSoundAlertIds = new Set();
@@ -187,7 +191,16 @@ document.addEventListener("DOMContentLoaded", function () {
         const enlace = evento.target.closest("a[data-notification-type]");
         if (!enlace) return;
         evento.preventDefault();
-        const marcarLeida = enlace.dataset.notificationType === "alert"
+        const esAlerta = enlace.dataset.notificationType === "alert";
+        const notificacion = (esAlerta
+            ? window.coalertaData.getAlerts()
+            : window.coalertaData.getNotices()
+        ).find((item) => String(item.id) === enlace.dataset.notificationId);
+        if (!notificacion || !isNotificationNotExpired(notificacion)) {
+            actualizarNotificaciones();
+            return;
+        }
+        const marcarLeida = esAlerta
             ? window.coalertaData.markAlertRead(enlace.dataset.notificationId)
             : window.coalertaData.markNoticeRead(enlace.dataset.notificationId);
         marcarLeida.then(() => {
@@ -234,6 +247,10 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function actualizarNotificaciones() {
+        if (notificationExpiryTimer !== null) {
+            window.clearTimeout(notificationExpiryTimer);
+            notificationExpiryTimer = null;
+        }
         if (!window.coalertaData || !window.coalertaData.isReady()) {
             lista.textContent = "Inicia sesión para recibir alertas cercanas.";
             contador.hidden = true;
@@ -242,6 +259,12 @@ document.addEventListener("DOMContentLoaded", function () {
             return;
         }
         const perfil = window.coalertaData.getProfile() || {};
+        const ahora = Date.now();
+        const vigenciaNotificacionMs = 24 * 60 * 60 * 1000;
+        const noExpirada = (notificacion) => {
+            const timestamp = obtenerTimestamp(notificacion);
+            return timestamp > 0 && ahora - timestamp < vigenciaNotificacionMs;
+        };
         const propias = new Set(window.coalertaData.getMyAlerts()
             .map((alerta) => String(alerta.alertaId || alerta.id)));
         const avisosLeidos = new Set(window.coalertaData.getReadNotices()
@@ -256,7 +279,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     Number.isFinite(latitud) && Number.isFinite(longitud) &&
                     latitud >= -90 && latitud <= 90 && longitud >= -180 && longitud <= 180 &&
                     distanciaMetros(ubicacionActual.latitud, ubicacionActual.longitud, latitud, longitud) <= 5000;
-                return id && !propias.has(id) && !alerta.leida &&
+                return id && noExpirada(alerta) && !propias.has(id) && !alerta.leida &&
                     (window.coalertaData.isActive(alerta) ||
                         alerta.tipo === "alerta_abierta" &&
                         ["pendiente", "en_atencion"].includes(alerta.estado)) &&
@@ -268,12 +291,22 @@ document.addEventListener("DOMContentLoaded", function () {
         const avisos = window.coalertaData.getNotices()
             .filter((aviso) => {
                 const id = String(aviso.id || "");
-                return id && !avisosLeidos.has(id) &&
+                return id && noExpirada(aviso) && !avisosLeidos.has(id) &&
                     (!aviso.comunidadId || aviso.comunidadId === perfil.comunidadId);
             })
             .map((aviso) => ({ ...aviso, notificationType: "notice" }));
         const pendientes = [...alertas, ...avisos]
             .sort((a, b) => obtenerTimestamp(b) - obtenerTimestamp(a));
+        const siguienteExpiracion = pendientes.reduce((proxima, notificacion) => {
+            const expiracion = obtenerTimestamp(notificacion) + vigenciaNotificacionMs;
+            return expiracion > ahora ? Math.min(proxima, expiracion) : proxima;
+        }, Infinity);
+        if (Number.isFinite(siguienteExpiracion)) {
+            notificationExpiryTimer = window.setTimeout(
+                actualizarNotificaciones,
+                Math.max(1, siguienteExpiracion - ahora + 50)
+            );
+        }
         const total = pendientes.length;
 
         contador.hidden = total === 0;
@@ -344,7 +377,7 @@ document.addEventListener("DOMContentLoaded", function () {
         if (!window.coalertaData || !window.coalertaData.isReady()) return;
         const profile = window.coalertaData.getProfile() || {};
         const alerts = window.coalertaData.getAlerts().filter((alert) =>
-            isAlertVisibleForProfile(alert, profile)
+            isNotificationNotExpired(alert) && isAlertVisibleForProfile(alert, profile)
         );
         const currentIds = new Set(alerts.map((alert) => String(alert.id)));
         if (!alertSnapshotReady) {
@@ -365,7 +398,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     function detectarAvisosNuevos() {
         if (!window.coalertaData || !window.coalertaData.isReady()) return;
-        const avisos = window.coalertaData.getNotices();
+        const avisos = window.coalertaData.getNotices().filter(isNotificationNotExpired);
         const currentIds = new Set(avisos.map((aviso) => String(aviso.id)));
         if (!noticeSnapshotReady) {
             knownNoticeIds = currentIds;
@@ -392,11 +425,12 @@ document.addEventListener("DOMContentLoaded", function () {
             const notices = window.coalertaData.getNotices();
             const newRemoteAlertExists = Array.from(pendingSoundAlertIds).some((id) =>
                 !myAlertIds.has(id) && alerts.some((alert) =>
-                    String(alert.id) === id && window.coalertaData.isActive(alert)
+                    String(alert.id) === id && isNotificationNotExpired(alert) &&
+                    window.coalertaData.isActive(alert)
                 )
             );
             const newNoticeExists = Array.from(pendingSoundNoticeIds).some((id) =>
-                notices.some((notice) => String(notice.id) === id)
+                notices.some((notice) => String(notice.id) === id && isNotificationNotExpired(notice))
             );
             pendingSoundAlertIds.clear();
             pendingSoundNoticeIds.clear();
@@ -428,6 +462,11 @@ document.addEventListener("DOMContentLoaded", function () {
                 longitud
             ) <= 5000;
     }
+
+    function isNotificationNotExpired(notification) {
+        const timestamp = obtenerTimestamp(notification);
+        return timestamp > 0 && Date.now() - timestamp < 24 * 60 * 60 * 1000;
+    }
 });
 
 function distanciaMetros(lat1, lon1, lat2, lon2) {
@@ -447,7 +486,14 @@ function formatearDistancia(metros) {
 }
 
 function obtenerTimestamp(alerta) {
-    const timestamp = Date.parse(alerta.timestamp || "");
+    const rawTimestamp = alerta && alerta.timestamp;
+    const timestamp = rawTimestamp && typeof rawTimestamp.toMillis === "function"
+        ? rawTimestamp.toMillis()
+        : rawTimestamp && typeof rawTimestamp.toDate === "function"
+            ? rawTimestamp.toDate().getTime()
+            : rawTimestamp instanceof Date
+                ? rawTimestamp.getTime()
+                : Date.parse(rawTimestamp || "");
     if (Number.isFinite(timestamp)) return timestamp;
     const fechaHora = Date.parse(`${alerta.fecha || ""} ${alerta.hora || ""}`);
     return Number.isFinite(fechaHora) ? fechaHora : 0;

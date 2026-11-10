@@ -1,6 +1,3 @@
-/* =========================================================
-   COALERTA - UBICACION DE SESION
-========================================================= */
 (function () {
     let solicitudEnCurso = null;
     const claveUbicacion = "coalerta_ubicacion_sesion";

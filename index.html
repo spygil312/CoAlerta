@@ -1,32 +1,26 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CoAlerta | Seguridad para tu comunidad</title>
-
-    <!-- Fuente -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- Iconos -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <link rel="icon" type="image/svg+xml" href="assets/svg/logo.svg?v=2">
-    <!-- CSS -->
     <link rel="stylesheet" href="css/estilos.css?v=mobile-nav-fixed-20261102">
-    <link rel="stylesheet" href="css/index.css">
+    <link rel="stylesheet" href="css/index.css?v=hu07-home-four-categories-20261107">
+    <link rel="stylesheet" href="css/alertas.css?v=hu07-optional-alert-detail-20261107">
     <link rel="stylesheet" href="css/responsive.css">
     <script src="js/tema.js?v=20261028-auth-theme"></script>
 </head>
 
 <body>
-    <!-- =====================================================
-         HEADER
-    ====================================================== -->
     <header class="header">
         <div class="contenedor header-contenido">
 
-            <!-- LOGO -->
             <a href="index.html" class="logo" aria-label="Co Alerta, inicio">
                 <div class="logo-icono">
                     <i class="fa-solid fa-shield-halved"></i>
@@ -38,9 +32,6 @@
                 </div>
             </a>
 
-            <!-- =================================================
-                 MENÚ PARA PC
-            ================================================== -->
             <nav class="menu">
                 <a href="index.html" class="activo"> Inicio </a>
                 <a href="#como-funciona"> Cómo funciona </a>
@@ -49,32 +40,17 @@
                 <a href="#contacto"> Contacto</a>
             </nav>
 
-            <!-- =================================================
-                 BOTONES DEL HEADER
-            ================================================== -->
             <div class="header-botones">
                 <a href="pages/login.html" class="btn-login"> Iniciar sesión </a>
                 <a href="pages/registro.html" class="btn-registro"> Crear cuenta </a>
             </div>
 
-            <!-- =================================================
-                 BOTÓN HAMBURGUESA MOBILE
-            ================================================== -->
-            <button
-                class="menu-mobile"
-                id="btnMenu"
-                type="button"
-                aria-label="Abrir menú"
-                aria-expanded="false"
-                aria-controls="menuMobile"
-            >
+            <button class="menu-mobile" id="btnMenu" type="button" aria-label="Abrir menú" aria-expanded="false"
+                aria-controls="menuMobile">
                 <i class="fa-solid fa-bars"></i>
             </button>
         </div>
 
-        <!-- =====================================================
-             MENÚ MOBILE
-        ====================================================== -->
         <nav class="menu-mobile-contenido" id="menuMobile" aria-label="Menú principal móvil">
             <a href="index.html"> Inicio </a>
             <a href="#como-funciona"> Cómo funciona </a>
@@ -88,18 +64,9 @@
         </nav>
     </header>
 
-    <!-- =====================================================
-         CONTENIDO PRINCIPAL
-    ====================================================== -->
     <main>
-        <!-- =================================================
-             PORTADA / HERO
-        ================================================== -->
         <section class="hero">
             <div class="contenedor hero-contenido">
-                <!-- =============================================
-                     TEXTO
-                ============================================== -->
                 <div class="hero-texto">
                     <div class="etiqueta">
                         <i class="fa-solid fa-shield"></i>
@@ -118,7 +85,6 @@
                         esté en camino.
                     </p>
 
-                    <!-- BOTONES -->
                     <div class="hero-botones">
                         <a href="pages/registro.html" class="btn-principal">
                             Comenzar ahora
@@ -129,14 +95,16 @@
                             <i class="fa-solid fa-circle-play"></i>
                             Cómo funciona
                         </a>
+                        <label class="consentimiento-gps" for="consentimientoGPS">
+                            <input type="checkbox" id="consentimientoGPS">
+                            <span>Autorizo la captura y el uso de mi ubicación GPS para este reporte.</span>
+                        </label>
                         <button class="btn-emergencia-directa" type="button" id="btnEmergenciaAnonima">
                             <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
-                            Reportar emergencia ahora
+                            Elegir tipo de emergencia
                         </button>
                     </div>
-                    <p class="estado-emergencia-directa" id="estadoEmergenciaAnonima" role="status" aria-live="polite" hidden></p>
 
-                    <!-- INDICADORES -->
                     <div class="hero-seguridad">
                         <div class="seguridad-item">
                             <i class="fa-solid fa-lock"></i>
@@ -156,13 +124,9 @@
                     </div>
                 </div>
 
-                <!-- =============================================
-                     PANEL DE EJEMPLO
-                ============================================== -->
                 <div class="hero-panel">
                     <div class="panel-app">
 
-                        <!-- CABECERA -->
                         <div class="panel-header">
                             <div>
                                 <span class="estado-punto"></span>
@@ -171,7 +135,6 @@
                             <i class="fa-solid fa-bell"></i>
                         </div>
 
-                        <!-- UBICACIÓN -->
                         <div class="ubicacion-card">
                             <div class="ubicacion-icono">
                                 <i class="fa-solid fa-location-dot"></i>
@@ -185,37 +148,60 @@
                             </div>
                         </div>
 
-                        <!-- PREGUNTA -->
                         <div class="emergencia-titulo">
                             <span> ¿Qué está ocurriendo? </span>
                             <small> Selecciona una opción </small>
                         </div>
 
-                        <!-- BOTONES DE ALERTA -->
+                        <div class="descripcion-alerta-opcional">
+                            <label for="detalleEmergenciaAnonima">Descripción breve (opcional)</label>
+                            <textarea id="detalleEmergenciaAnonima" rows="2" maxlength="300"
+                                placeholder="Añade un detalle útil si lo deseas."></textarea>
+                            <small><span id="contadorDetalleEmergenciaAnonima">0</span>/300 caracteres</small>
+                        </div>
+
                         <div class="alertas-grid">
-                            <button class="alerta-card robo">
+                            <button class="alerta-card robo" type="button" data-emergencia="robo">
                                 <div class="alerta-icono">
                                     <i class="fa-solid fa-mask-face"></i>
                                 </div>
-                                <span> Robo </span>
+                                <span>Robo</span>
                             </button>
 
-                            <button class="alerta-card sospechoso">
+                            <button class="alerta-card sospechoso" type="button" data-emergencia="sospecha">
                                 <div class="alerta-icono">
                                     <i class="fa-solid fa-user-secret"></i>
                                 </div>
-                                <span> Sospechoso </span>
+                                <span>Sospecha</span>
                             </button>
 
-                            <button class="alerta-card accidente">
+                            <button class="alerta-card accidente" type="button" data-emergencia="accidente">
                                 <div class="alerta-icono">
                                     <i class="fa-solid fa-truck-medical"></i>
                                 </div>
-                                <span> Accidente </span>
+                                <span>Accidente</span>
+                            </button>
+
+                            <button class="alerta-card incendio" type="button" data-emergencia="incendio">
+                                <div class="alerta-icono">
+                                    <i class="fa-solid fa-fire" aria-hidden="true"></i>
+                                </div>
+                                <span>Incendio</span>
                             </button>
                         </div>
+                        <section class="confirmacion-cuenta-regresiva" id="confirmacionCuentaRegresivaAnonima"
+                            aria-live="assertive" hidden>
+                            <strong id="cuentaRegresivaNumeroAnonima">3</strong>
+                            <p>Enviando alerta en</p>
+                            <div class="cuenta-regresiva-barra">
+                                <span id="cuentaRegresivaProgresoAnonima"></span>
+                            </div>
+                            <button type="button" class="btn-cancelar-alerta"
+                                id="btnCancelarAlertaAnonima">CANCELAR</button>
+                        </section>
+                        <p class="estado-envio-alerta estado-emergencia-directa" id="estadoEmergenciaAnonima"
+                            role="status" aria-live="polite" hidden></p>
 
-                        <!-- ESTADO DE ZONA -->
                         <div class="zona-segura">
                             <div class="zona-icono">
                                 <i class="fa-solid fa-shield-halved"></i>
@@ -235,9 +221,6 @@
             </div>
         </section>
 
-        <!-- =================================================
-             BENEFICIOS
-        ================================================== -->
         <section class="beneficios" id="beneficios">
             <div class="contenedor">
                 <div class="titulo-seccion">
@@ -252,13 +235,11 @@
                 </div>
 
                 <div class="beneficios-grid">
-
-                    <!-- BENEFICIO 1 -->
                     <article class="beneficio-card">
                         <div class="beneficio-icono">
                             <i class="fa-solid fa-bolt"></i>
                         </div>
-                        <h3> Alertas rápidas  </h3>
+                        <h3> Alertas rápidas </h3>
 
                         <p>
                             Reporta una emergencia en pocos
@@ -267,7 +248,6 @@
                         </p>
                     </article>
 
-                    <!-- BENEFICIO 2 -->
                     <article class="beneficio-card">
                         <div class="beneficio-icono">
                             <i class="fa-solid fa-location-crosshairs"></i>
@@ -281,7 +261,6 @@
                         </p>
                     </article>
 
-                    <!-- BENEFICIO 3 -->
                     <article class="beneficio-card">
                         <div class="beneficio-icono">
                             <i class="fa-solid fa-shield-halved"></i>
@@ -294,7 +273,6 @@
                         </p>
                     </article>
 
-                    <!-- BENEFICIO 4 -->
                     <article class="beneficio-card">
                         <div class="beneficio-icono">
                             <i class="fa-solid fa-circle-check"></i>
@@ -310,9 +288,6 @@
             </div>
         </section>
 
-        <!-- =================================================
-             CÓMO FUNCIONA
-        ================================================== -->
         <section class="como-funciona" id="como-funciona">
             <div class="contenedor">
                 <div class="titulo-seccion">
@@ -328,7 +303,6 @@
 
                 <div class="pasos">
 
-                    <!-- PASO 1 -->
                     <div class="paso">
                         <div class="paso-numero">
                             1
@@ -348,7 +322,6 @@
 
                     <div class="paso-linea"></div>
 
-                    <!-- PASO 2 -->
                     <div class="paso">
                         <div class="paso-numero">
                             2
@@ -368,7 +341,6 @@
 
                     <div class="paso-linea"></div>
 
-                    <!-- PASO 3 -->
                     <div class="paso">
                         <div class="paso-numero">
                             3
@@ -389,13 +361,8 @@
             </div>
         </section>
 
-        <!-- =================================================
-             SEGURIDAD
-        ================================================== -->
         <section class="seguridad" id="seguridad">
             <div class="contenedor seguridad-contenido">
-
-                <!-- INFORMACIÓN -->
                 <div class="seguridad-info">
                     <span class="subtitulo">
                         Tu información protegida
@@ -433,7 +400,6 @@
                     </div>
                 </div>
 
-                <!-- TARJETA -->
                 <div class="seguridad-card">
                     <div class="escudo-grande">
                         <i class="fa-solid fa-shield-halved"></i>
@@ -454,9 +420,6 @@
             </div>
         </section>
 
-        <!-- =================================================
-             CTA
-        ================================================== -->
         <section class="cta">
             <div class="contenedor cta-contenido">
                 <div>
@@ -475,13 +438,8 @@
         </section>
     </main>
 
-    <!-- =====================================================
-         FOOTER
-    ====================================================== -->
     <footer class="footer" id="contacto">
         <div class="contenedor footer-grid">
-            
-            <!-- MARCA -->
             <div class="footer-marca">
                 <a href="index.html" class="logo" aria-label="Co Alerta, inicio">
 
@@ -499,7 +457,6 @@
                 </p>
             </div>
 
-            <!-- PLATAFORMA -->
             <div class="footer-columna">
                 <h4> Plataforma </h4>
                 <a href="#como-funciona"> Cómo funciona</a>
@@ -507,14 +464,12 @@
                 <a href="#seguridad">Seguridad</a>
             </div>
 
-            <!-- CUENTA -->
             <div class="footer-columna">
                 <h4> Cuenta </h4>
                 <a href="pages/login.html">Iniciar sesión</a>
                 <a href="pages/registro.html">Crear cuenta</a>
             </div>
 
-            <!-- CONTACTO -->
             <div class="footer-columna">
                 <h4> Contacto </h4>
 
@@ -532,7 +487,7 @@
         </div>
     </footer>
     <script src="js/menu-mobile.js"></script>
-    <script src="js/emergency-report.js?v=location-permission-guidance-20261104"></script>
-    <script type="module" src="js/app.js?v=emergency-location-consent-20261102"></script>
+    <script src="js/emergency-report.js?v=hu08-localhost-gps-test-20261107"></script>
 </body>
+
 </html>

@@ -3,9 +3,7 @@ import {
     setPersistence, signInWithEmailAndPassword, signOut
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import {
-    doc,
-    runTransaction,
-    serverTimestamp
+    doc, runTransaction, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
 
@@ -212,7 +210,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         if (!/^\d{8}$/.test(data.dni)) throw new Error("El DNI debe tener exactamente 8 dígitos.");
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.correo)) throw new Error("Ingresa un correo válido.");
-        if (!/^\d{9}$/.test(data.telefono)) throw new Error("El celular debe tener exactamente 9 dígitos.");
+        if (!/^9\d{8}$/.test(data.telefono)) throw new Error("El celular debe empezar con 9 y tener exactamente 9 dígitos.");
         if (!activeGoogleUser && data.password.length < 8) {
             throw new Error("La contraseña debe tener mínimo 8 caracteres.");
         }
@@ -231,9 +229,9 @@ document.addEventListener("DOMContentLoaded", function () {
             "auth/email-already-in-use": "Ese correo ya tiene una cuenta. Inicia sesión o usa la recuperación de contraseña.",
             "auth/invalid-email": "El correo electrónico no tiene un formato válido.",
             "auth/weak-password": "La contraseña debe tener al menos 8 caracteres.",
-            "already-exists": "El DNI ya está registrado o esta cuenta ya completó su perfil.",
+            "already-exists": "El DNI ingresado ya se encuentra registrado",
             "registration/account-already-exists": "Esta cuenta ya tiene un perfil registrado. Inicia sesión con tu correo y contraseña.",
-            "permission-denied": "No se pudo guardar el registro. Es posible que el DNI ya esté registrado o que las reglas de Firestore aún no estén actualizadas."
+            "permission-denied": "El DNI ingresado ya se encuentra registrado"
         };
         return messages[error.code] || error.message || "No se pudo completar el registro. Inténtalo nuevamente.";
     }

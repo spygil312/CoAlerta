@@ -190,6 +190,12 @@ service cloud.firestore {
       return activeUser() && profile(request.auth.uid).comunidadId == comunidadId;
     }
 
+    function neighborCanReadCommunityDelegation(comunidadId) {
+      return activeUser()
+        && profile(request.auth.uid).rol == 'vecino'
+        && profile(request.auth.uid).comunidadId == comunidadId;
+    }
+
     function coordinatorFor(comunidadId) {
       return activeUser()
         && (
@@ -388,7 +394,7 @@ service cloud.firestore {
         && changed.hasAny(['nombre', 'telefono'])
         && request.resource.data.nombre == profile(uid).nombre
         && request.resource.data.telefono == profile(uid).telefono
-        && request.resource.data.telefono.matches('^[0-9]{9}$');
+        && request.resource.data.telefono.matches('^9[0-9]{8}$');
     }
 
     function validOfficialNoticeCreate() {
@@ -436,9 +442,9 @@ service cloud.firestore {
         && data.mensaje.size() > 0
         && data.mensaje.size() <= 500
         && data.plantilla in [
-          'Emergencia canalizada',
-          'Sujeto retenido por autoridades',
-          'Zona segura',
+          'Emergencia Canalizada',
+          'Sujeto Retenido por Autoridades',
+          'Zona Segura',
           'Falsa alarma aclarada por autoridades'
         ]
         && data.tipoIncidente == incidentType
@@ -531,12 +537,21 @@ service cloud.firestore {
           && existsAfter(closePatrolPath)
           && getAfter(closePatrolPath).data.estado == 'En sitio'
           && getAfter(closePatrolPath).data.incidenteId == incidentId
+          && getAfter(closePatrolPath).data.precisionMetros is number
+          && getAfter(closePatrolPath).data.precisionMetros < 15
+          && getAfter(closePatrolPath).data.latitud is number
+          && getAfter(closePatrolPath).data.latitud > resource.data.latitud - 0.00014
+          && getAfter(closePatrolPath).data.latitud < resource.data.latitud + 0.00014
+          && getAfter(closePatrolPath).data.longitud is number
+          && getAfter(closePatrolPath).data.longitud > resource.data.longitud - 0.00014
+          && getAfter(closePatrolPath).data.longitud < resource.data.longitud + 0.00014
           && changed.hasOnly(['estado', 'enSitioAt', 'ultimaActualizacion'])
           && request.resource.data.enSitioAt == request.time
           || assignedOperator
           && resource.data.estado == 'Agentes en sitio'
           && request.resource.data.estado == 'Emergencia Concluida'
           && request.resource.data.resultado in [
+            'Delincuente retenido',
             'Intervención preventiva',
             'Sujeto intervenido',
             'Falsa alarma',
@@ -549,6 +564,112 @@ service cloud.firestore {
           && request.resource.data.resueltoPorUid == request.auth.uid
           && changed.hasOnly(['estado', 'resultado', 'closedAt', 'ultimaActualizacion', 'resueltoPorUid'])
           && request.resource.data.closedAt == request.time
+        );
+    }
+
+    function validAuditLogCreate() {
+      let data = request.resource.data;
+      let incidentPath = /databases/$(database)/documents/incidentes/$(data.alertaId);
+      let before = get(incidentPath).data;
+      let after = getAfter(incidentPath).data;
+      let patrolId = after.get('patrullaId', '');
+      let patrolPath = /databases/$(database)/documents/patrullas/$(patrolId is string && patrolId.size() > 0 ? patrolId : 'no-assignment');
+      let coordinator = coordinatorFor(before.comunidadId);
+      let assignedOperator = operator()
+        && (adminOperator()
+          || profile(request.auth.uid).comunidadId == before.comunidadId
+          && profile(request.auth.uid).patrullaId == before.get('patrullaId', null));
+      let dispatchOperator = operator()
+        && (adminOperator()
+          || profile(request.auth.uid).comunidadId == before.comunidadId
+          && profile(request.auth.uid).patrullaId == after.get('patrullaId', null));
+      return activeUser()
+        && data.alertaId is string
+        && data.alertaId.size() > 0
+        && exists(incidentPath)
+        && existsAfter(incidentPath)
+        && data.keys().hasAll([
+          'alertaId',
+          'operadorId',
+          'patrullaId',
+          'accion',
+          'coordenadas',
+          'comunidadId',
+          'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'alertaId',
+          'operadorId',
+          'patrullaId',
+          'accion',
+          'coordenadas',
+          'comunidadId',
+          'createdAt'
+        ])
+        && data.operadorId == request.auth.uid
+        && data.comunidadId == after.comunidadId
+        && data.patrullaId == after.get('patrullaId', null)
+        && data.createdAt == request.time
+        && data.coordenadas is map
+        && data.coordenadas.latitud is number
+        && data.coordenadas.latitud >= -90
+        && data.coordenadas.latitud <= 90
+        && data.coordenadas.longitud is number
+        && data.coordenadas.longitud >= -180
+        && data.coordenadas.longitud <= 180
+        && (
+          coordinator
+          && data.accion == 'validate'
+          && before.estado == 'Recibido en servidor'
+          && after.estado == 'Derivada a Central'
+          && after.derivadaAt == request.time
+          && data.coordenadas.latitud == before.latitud
+          && data.coordenadas.longitud == before.longitud
+          || coordinator
+          && data.accion == 'discard'
+          && before.estado in [
+            'Recibido en servidor',
+            'En revisión',
+            'Derivada a Central',
+            'Auxilio en camino',
+            'Agentes en sitio'
+          ]
+          && after.estado == 'Descartada'
+          && after.resueltoPorUid == request.auth.uid
+          && after.closedAt == request.time
+          && data.coordenadas.latitud == before.latitud
+          && data.coordenadas.longitud == before.longitud
+          || dispatchOperator
+          && data.accion == 'dispatch'
+          && before.estado == 'Derivada a Central'
+          && after.estado == 'Auxilio en camino'
+          && after.despachoAt == request.time
+          && existsAfter(patrolPath)
+          && getAfter(patrolPath).data.estado == 'Despachado'
+          && getAfter(patrolPath).data.incidenteId == data.alertaId
+          && getAfter(patrolPath).data.comunidadId == before.comunidadId
+          && data.coordenadas.latitud == getAfter(patrolPath).data.latitud
+          && data.coordenadas.longitud == getAfter(patrolPath).data.longitud
+          || assignedOperator
+          && data.accion == 'onsite'
+          && before.estado == 'Auxilio en camino'
+          && after.estado == 'Agentes en sitio'
+          && after.enSitioAt == request.time
+          && existsAfter(patrolPath)
+          && getAfter(patrolPath).data.estado == 'En sitio'
+          && getAfter(patrolPath).data.incidenteId == data.alertaId
+          && data.coordenadas.latitud == getAfter(patrolPath).data.latitud
+          && data.coordenadas.longitud == getAfter(patrolPath).data.longitud
+          || assignedOperator
+          && data.accion == 'close'
+          && before.estado == 'Agentes en sitio'
+          && after.estado == 'Emergencia Concluida'
+          && after.closedAt == request.time
+          && existsAfter(patrolPath)
+          && getAfter(patrolPath).data.estado == 'Disponible'
+          && getAfter(patrolPath).data.incidenteId == null
+          && data.coordenadas.latitud == getAfter(patrolPath).data.latitud
+          && data.coordenadas.longitud == getAfter(patrolPath).data.longitud
         );
     }
 
@@ -585,14 +706,21 @@ service cloud.firestore {
         && request.resource.data.comunidadId == incident.comunidadId;
     }
 
-    function canReadPublicAlert(data) {
+    function canReadPublicAlert(alertId, data) {
+      let userCommunity = profile(request.auth.uid).get('comunidadId', null);
+      let incidentPath = /databases/$(database)/documents/incidentes/$(alertId);
       return activeUser()
         && (
-          profile(request.auth.uid).get('comunidadId', null) is string
-          && profile(request.auth.uid).comunidadId.size() > 0
-          && data.get('comunidadId', null) == profile(request.auth.uid).comunidadId
-          || (profile(request.auth.uid).get('comunidadId', null) == null
-            || profile(request.auth.uid).comunidadId == '')
+          userCommunity is string
+          && userCommunity.size() > 0
+          && data.get('comunidadId', null) == userCommunity
+          || userCommunity is string
+          && userCommunity.size() > 0
+          && data.get('comunidadId', null) in [null, '']
+          && exists(incidentPath)
+          && request.auth.uid in get(incidentPath).data.get('reporterUids', [])
+          && get(incidentPath).data.get('comunidadId', null) in [null, '']
+          || (userCommunity == null || userCommunity == '')
           && data.get('visibilidad', '') == 'publica'
         );
     }
@@ -631,7 +759,7 @@ service cloud.firestore {
         && data.apellidos.size() <= 100
         && data.nombre == data.nombres + ' ' + data.apellidos
         && data.telefono is string
-        && data.telefono.matches('^[0-9]{9}$')
+        && data.telefono.matches('^9[0-9]{8}$')
         && data.direccion is string
         && data.direccion.size() > 0
         && data.direccion.size() <= 160
@@ -656,7 +784,7 @@ service cloud.firestore {
             && contacts[0].nombre.size() > 0
             && contacts[0].nombre.size() <= 80
             && contacts[0].telefono is string
-            && contacts[0].telefono.matches('^[0-9]{9}$'))
+            && contacts[0].telefono.matches('^9[0-9]{8}$'))
           && (contacts.size() < 2
             || contacts[1] is map
             && contacts[1].keys().hasOnly(['nombre', 'telefono'])
@@ -664,7 +792,48 @@ service cloud.firestore {
             && contacts[1].nombre.size() > 0
             && contacts[1].nombre.size() <= 80
             && contacts[1].telefono is string
-            && contacts[1].telefono.matches('^[0-9]{9}$')));
+            && contacts[1].telefono.matches('^9[0-9]{8}$')));
+    }
+
+    function validOutgoingContactMessage() {
+      let data = request.resource.data;
+      let contacts = getAfter(
+        /databases/$(database)/documents/usuarios/$(request.auth.uid)
+      ).data.get('contactosEmergencia', []);
+      return activeUser()
+        && data.keys().hasOnly([
+          'nombre',
+          'telefono',
+          'usuarioId',
+          'tipo',
+          'estado',
+          'creadoEn'
+        ])
+        && data.keys().hasAll([
+          'nombre',
+          'telefono',
+          'usuarioId',
+          'tipo',
+          'estado',
+          'creadoEn'
+        ])
+        && data.usuarioId == request.auth.uid
+        && data.nombre is string
+        && data.nombre.size() > 0
+        && data.nombre.size() <= 80
+        && data.telefono is string
+        && data.telefono.matches('^9[0-9]{8}$')
+        && data.tipo == 'asignacion_contacto_emergencia'
+        && data.estado == 'pendiente'
+        && data.creadoEn == request.time
+        && contacts is list
+        && contacts.size() <= 2
+        && ((contacts.size() > 0
+            && contacts[0].nombre == data.nombre
+            && contacts[0].telefono == data.telefono)
+          || (contacts.size() > 1
+            && contacts[1].nombre == data.nombre
+            && contacts[1].telefono == data.telefono));
     }
 
     function validSelfLocationUpdate(uid) {
@@ -673,10 +842,12 @@ service cloud.firestore {
       return self(uid)
         && activeUser()
         && resource.data.rol in ['seguridad', 'agente']
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ultimaUbicacion'])
+        && (
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['ultimaUbicacion'])
+        )
         && (
           location == null
-          && resource.data.rol in ['seguridad', 'agente']
           || location is map
           && location.keys().hasOnly(['latitud', 'longitud', 'timestamp'])
           && location.keys().hasAll(['latitud', 'longitud', 'timestamp'])
@@ -758,7 +929,7 @@ service cloud.firestore {
 
     function validZoneWrite(comunidadId) {
       let data = request.resource.data;
-      return coordinatorFor(comunidadId)
+      return (coordinatorFor(comunidadId) || adminOperator())
         && data.keys().hasOnly([
           'comunidadId',
           'latitud',
@@ -852,6 +1023,35 @@ service cloud.firestore {
         && data.updatedAt == request.time;
     }
 
+    function canReadAssignedPatrol(patrolId) {
+      let unitPath = /databases/$(database)/documents/unidades/$(patrolId);
+      return operator()
+        && profile(request.auth.uid).patrullaId == patrolId
+        && profile(request.auth.uid).comunidadId is string
+        && profile(request.auth.uid).comunidadId.size() > 0
+        && validUnitId(patrolId)
+        && exists(unitPath)
+        && get(unitPath).data.estado == 'ocupada'
+        && get(unitPath).data.asignadaA == request.auth.uid
+        && (profile(request.auth.uid).rol != 'seguridad'
+          || profile(request.auth.uid).estadoSolicitudRol == 'aprobada');
+    }
+
+    function reporterCanReadAssignedPatrol(patrolId) {
+      let incidentId = resource.data.get('incidenteId', 'sin_incidente');
+      let incidentPath = /databases/$(database)/documents/incidentes/$(incidentId);
+      return activeUser()
+        && incidentId is string
+        && incidentId.size() > 0
+        && exists(incidentPath)
+        && request.auth.uid in get(incidentPath).data.get('reporterUids', [])
+        && get(incidentPath).data.get('patrullaId', null) == patrolId
+        && get(incidentPath).data.get('comunidadId', null)
+          == profile(request.auth.uid).get('comunidadId', null)
+        && get(incidentPath).data.get('estado', '')
+          in ['Auxilio en camino', 'Atendiendo', 'Agentes en sitio'];
+    }
+
     function validPatrolCreate(patrolId) {
       let data = request.resource.data;
       return validPatrolLocation(patrolId)
@@ -883,7 +1083,11 @@ service cloud.firestore {
 
     function validPatrolUpdate(patrolId) {
       let changed = request.resource.data.diff(resource.data).affectedKeys();
-      let locationUpdate = validPatrolLocation(patrolId)
+      let data = request.resource.data;
+      let incidentId = data.get('incidenteId', '');
+      let incidentPath = /databases/$(database)/documents/incidentes/$(incidentId is string ? incidentId : 'no-incident');
+      let incident = getAfter(incidentPath).data;
+      let locationAndStatusUpdate = validPatrolLocation(patrolId)
         && changed.hasOnly([
           'comunidadId',
           'agenteUid',
@@ -891,22 +1095,38 @@ service cloud.firestore {
           'longitud',
           'precisionMetros',
           'updatedAt',
-          'estado'
+          'estado',
+          'incidenteId'
         ])
+        && data.comunidadId == resource.data.comunidadId
+        && data.agenteUid == request.auth.uid
+        && data.updatedAt == request.time
         && (
-          request.resource.data.get('estado', null) == resource.data.get('estado', null)
-          || resource.data.get('estado', null) == null
-          && request.resource.data.estado == 'Disponible'
-          && resource.data.get('incidenteId', null) == null
-          && request.resource.data.get('incidenteId', null) == null
-        )
-        && request.resource.data.get('incidenteId', null) == resource.data.get('incidenteId', null)
-        && (resource.data.get('comunidadId', null) == null
-          || resource.data.comunidadId == request.resource.data.comunidadId)
-        && (!('updatedAt' in resource.data)
-          || resource.data.updatedAt is timestamp
-          && resource.data.updatedAt <= request.time - duration.value(5, 's'));
-      return locationUpdate || validPatrolStatusUpdate(patrolId);
+          data.estado == resource.data.get('estado', null)
+          && data.get('incidenteId', null) == resource.data.get('incidenteId', null)
+          || existsAfter(incidentPath)
+          && incident.patrullaId == patrolId
+          && incident.comunidadId == resource.data.comunidadId
+          && data.comunidadId == incident.comunidadId
+          && (
+            data.estado == 'Despachado'
+            && incident.estado == 'Auxilio en camino'
+            && resource.data.estado == 'Disponible'
+            && resource.data.get('incidenteId', null) == null
+            && data.incidenteId == incidentId
+            || data.estado == 'En sitio'
+            && incident.estado == 'Agentes en sitio'
+            && resource.data.estado == 'Despachado'
+            && resource.data.incidenteId == incidentId
+            && data.incidenteId == incidentId
+            || data.estado == 'Disponible'
+            && incident.estado == 'Emergencia Concluida'
+            && resource.data.estado == 'En sitio'
+            && resource.data.incidenteId == incidentId
+            && data.get('incidenteId', null) == null
+          )
+        );
+      return locationAndStatusUpdate || validPatrolStatusUpdate(patrolId);
     }
 
     function validPatrolStatusUpdate(patrolId) {
@@ -916,8 +1136,11 @@ service cloud.firestore {
         : existingIncidentId;
       let incidentPath = /databases/$(database)/documents/incidentes/$(incidentId);
       let incident = getAfter(incidentPath).data;
-      let statusUpdate = operator()
-        && (adminOperator() || profile(request.auth.uid).patrullaId == patrolId)
+      let assignedOperator = activeUser()
+        && profile(request.auth.uid).rol in ['agente', 'seguridad']
+        && profile(request.auth.uid).patrullaId == patrolId
+        && profile(request.auth.uid).comunidadId == resource.data.comunidadId;
+      let statusUpdate = (adminOperator() || assignedOperator)
         && (adminOperator()
           || profile(request.auth.uid).comunidadId == resource.data.comunidadId)
         && existsAfter(incidentPath)
@@ -1032,7 +1255,7 @@ service cloud.firestore {
         && data.apellidos.size() <= 100
         && data.nombre == data.nombres + ' ' + data.apellidos
         && data.telefono is string
-        && data.telefono.matches('^[0-9]{9}$')
+        && data.telefono.matches('^9[0-9]{8}$')
         && data.dni is string
         && data.dni.matches('^[0-9]{8}$')
         && data.direccion is string
@@ -1064,6 +1287,8 @@ service cloud.firestore {
           'id',
           'tipo',
           'categoria',
+          'codigoCategoria',
+          'consentimientoGPS',
           'detalle',
           'latitud',
           'longitud',
@@ -1074,12 +1299,19 @@ service cloud.firestore {
           'reportes',
           'reporterUids',
           'comunidadId',
-          'ultimaActualizacion'
+          'ultimaActualizacion',
+          'ultimaAgrupacionLatitud',
+          'ultimaAgrupacionLongitud',
+          'ultimaAgrupacionAt',
+          'ultimaAgrupacionUid',
+          'ultimaAgrupacionCategoria'
         ])
         && data.keys().hasOnly([
           'id',
           'tipo',
           'categoria',
+          'codigoCategoria',
+          'consentimientoGPS',
           'detalle',
           'latitud',
           'longitud',
@@ -1090,10 +1322,22 @@ service cloud.firestore {
           'reportes',
           'reporterUids',
           'comunidadId',
-          'ultimaActualizacion'
+          'ultimaActualizacion',
+          'ultimaAgrupacionLatitud',
+          'ultimaAgrupacionLongitud',
+          'ultimaAgrupacionAt',
+          'ultimaAgrupacionUid',
+          'ultimaAgrupacionCategoria'
         ])
         && data.id == incidentId
         && data.categoria in ['robo', 'sospecha', 'accidente', 'incendio']
+        && data.codigoCategoria == (
+          data.categoria == 'robo' ? 'ROBO_PROCESO'
+          : data.categoria == 'sospecha' ? 'PRESENCIA_SOSPECHOSA'
+          : data.categoria == 'accidente' ? 'ACCIDENTE'
+          : 'INCENDIO'
+        )
+        && data.consentimientoGPS == true
         && data.tipo == (
           data.categoria == 'robo' ? 'Robo'
           : data.categoria == 'sospecha' ? 'Sospecha'
@@ -1117,9 +1361,62 @@ service cloud.firestore {
         && data.ultimaActualizacion == request.time
         && data.reportes == 1
         && data.reporterUids == [request.auth.uid]
+        && data.ultimaAgrupacionLatitud == data.latitud
+        && data.ultimaAgrupacionLongitud == data.longitud
+        && data.ultimaAgrupacionAt == request.time
+        && data.ultimaAgrupacionUid == request.auth.uid
+        && data.ultimaAgrupacionCategoria == data.categoria
         && data.comunidadId == profile(request.auth.uid).get('comunidadId', null)
         && throttle.uid == request.auth.uid
         && throttle.ultimaAlertaAt == request.time;
+    }
+
+    function validIncidentGroupUpdate(incidentId) {
+      let data = request.resource.data;
+      let reporters = resource.data.get('reporterUids', []);
+      return activeUser()
+        && resource.data.id == incidentId
+        && resource.data.comunidadId is string
+        && profile(request.auth.uid).comunidadId == resource.data.comunidadId
+        && resource.data.estado in ['Recibido en servidor', 'En revisión', 'Derivada a Central']
+        && resource.data.timestamp is timestamp
+        && resource.data.timestamp <= request.time
+        && resource.data.timestamp > request.time - duration.value(3, 'm')
+        && reporters is list
+        && reporters.size() < 50
+        && !(request.auth.uid in reporters)
+        && data.diff(resource.data).affectedKeys().hasOnly([
+          'reportes',
+          'reporterUids',
+          'ultimaAgrupacionLatitud',
+          'ultimaAgrupacionLongitud',
+          'ultimaAgrupacionAt',
+          'ultimaAgrupacionUid',
+          'ultimaAgrupacionCategoria',
+          'ultimaActualizacion'
+        ])
+        && data.reportes is int
+        && data.reportes == resource.data.reportes + 1
+        && data.reportes == reporters.size() + 1
+        && data.reporterUids is list
+        && data.reporterUids.size() == reporters.size() + 1
+        && data.reporterUids.size() <= 50
+        && data.reporterUids.hasAll(reporters)
+        && request.auth.uid in data.reporterUids
+        && data.ultimaAgrupacionLatitud is number
+        && data.ultimaAgrupacionLatitud >= -90
+        && data.ultimaAgrupacionLatitud <= 90
+        && data.ultimaAgrupacionLatitud >= resource.data.latitud - 0.0005
+        && data.ultimaAgrupacionLatitud <= resource.data.latitud + 0.0005
+        && data.ultimaAgrupacionLongitud is number
+        && data.ultimaAgrupacionLongitud >= -180
+        && data.ultimaAgrupacionLongitud <= 180
+        && data.ultimaAgrupacionLongitud >= resource.data.longitud - 0.0005
+        && data.ultimaAgrupacionLongitud <= resource.data.longitud + 0.0005
+        && data.ultimaAgrupacionAt == request.time
+        && data.ultimaAgrupacionUid == request.auth.uid
+        && data.ultimaAgrupacionCategoria == resource.data.categoria
+        && data.ultimaActualizacion == request.time;
     }
 
     function validPublicAlertCreate(incidentId) {
@@ -1195,8 +1492,122 @@ service cloud.firestore {
         'estado',
         'atendidaAt'
       ];
+      let baseFieldsWithConsent = [
+        'tipo',
+        'comunidadId',
+        'ubicacion',
+        'creadorId',
+        'timestamp',
+        'estado',
+        'consentimientoGPS'
+      ];
+      let attendedFieldsWithConsent = [
+        'tipo',
+        'comunidadId',
+        'ubicacion',
+        'creadorId',
+        'timestamp',
+        'estado',
+        'consentimientoGPS',
+        'atendidaAt'
+      ];
+      let baseFieldsWithCategory = [
+        'tipo',
+        'comunidadId',
+        'ubicacion',
+        'creadorId',
+        'timestamp',
+        'estado',
+        'categoria',
+        'precisionMetros'
+      ];
+      let baseFieldsWithConsentAndCategory = [
+        'tipo',
+        'comunidadId',
+        'ubicacion',
+        'creadorId',
+        'timestamp',
+        'estado',
+        'consentimientoGPS',
+        'categoria',
+        'precisionMetros'
+      ];
       return data.keys().hasAll(baseFields)
-        && data.keys().hasOnly(attendedFields)
+        && (data.keys().hasOnly(attendedFields)
+          || data.keys().hasOnly(attendedFieldsWithConsent)
+          || data.keys().hasOnly(baseFieldsWithCategory)
+          || data.keys().hasOnly(baseFieldsWithConsentAndCategory)
+          || data.keys().hasOnly([
+            'tipo',
+            'comunidadId',
+            'ubicacion',
+            'creadorId',
+            'timestamp',
+            'estado',
+            'categoria',
+            'precisionMetros',
+            'detalle'
+          ])
+          || data.keys().hasOnly([
+            'tipo',
+            'comunidadId',
+            'ubicacion',
+            'creadorId',
+            'timestamp',
+            'estado',
+            'consentimientoGPS',
+            'categoria',
+            'precisionMetros',
+            'detalle'
+          ])
+          || data.keys().hasOnly([
+            'tipo',
+            'comunidadId',
+            'ubicacion',
+            'creadorId',
+            'timestamp',
+            'estado',
+            'atendidaAt',
+            'categoria',
+            'precisionMetros'
+          ])
+          || data.keys().hasOnly([
+            'tipo',
+            'comunidadId',
+            'ubicacion',
+            'creadorId',
+            'timestamp',
+            'estado',
+            'consentimientoGPS',
+            'atendidaAt',
+            'categoria',
+            'precisionMetros'
+          ])
+          || data.keys().hasOnly([
+            'tipo',
+            'comunidadId',
+            'ubicacion',
+            'creadorId',
+            'timestamp',
+            'estado',
+            'atendidaAt',
+            'categoria',
+            'precisionMetros',
+            'detalle'
+          ])
+          || data.keys().hasOnly([
+            'tipo',
+            'comunidadId',
+            'ubicacion',
+            'creadorId',
+            'timestamp',
+            'estado',
+            'consentimientoGPS',
+            'atendidaAt',
+            'categoria',
+            'precisionMetros',
+            'detalle'
+          ]))
         && data.tipo == 'alerta_abierta'
         && data.comunidadId == null
         && data.ubicacion is map
@@ -1209,10 +1620,45 @@ service cloud.firestore {
         && data.ubicacion.lng >= -180
         && data.ubicacion.lng <= 180
         && data.creadorId is string
+        && (!('consentimientoGPS' in data) || data.consentimientoGPS == true)
+        && (!('detalle' in data) || data.detalle is string && data.detalle.size() <= 300)
+        && (
+          !('categoria' in data) && !('precisionMetros' in data)
+          || data.categoria in ['robo', 'sospecha', 'accidente', 'incendio']
+            && data.precisionMetros is number
+            && data.precisionMetros > 0
+            && data.precisionMetros < 5
+        )
         && data.timestamp is timestamp
         && (
           data.estado == 'pendiente'
-          && data.keys().hasOnly(baseFields)
+          && (data.keys().hasOnly(baseFields)
+            || data.keys().hasOnly(baseFieldsWithConsent)
+            || data.keys().hasOnly(baseFieldsWithCategory)
+            || data.keys().hasOnly(baseFieldsWithConsentAndCategory)
+            || data.keys().hasOnly([
+              'tipo',
+              'comunidadId',
+              'ubicacion',
+              'creadorId',
+              'timestamp',
+              'estado',
+              'categoria',
+              'precisionMetros',
+              'detalle'
+            ])
+            || data.keys().hasOnly([
+              'tipo',
+              'comunidadId',
+              'ubicacion',
+              'creadorId',
+              'timestamp',
+              'estado',
+              'consentimientoGPS',
+              'categoria',
+              'precisionMetros',
+              'detalle'
+            ]))
           || data.estado == 'en_atencion'
           && data.keys().hasAll(['atendidaAt'])
           && data.atendidaAt is timestamp
@@ -1221,14 +1667,6 @@ service cloud.firestore {
 
     function validOpenEmergencyData(data) {
       return validOpenEmergencyRecord(data)
-        && data.keys().hasOnly([
-          'tipo',
-          'comunidadId',
-          'ubicacion',
-          'creadorId',
-          'timestamp',
-          'estado'
-        ])
         && data.estado == 'pendiente';
     }
 
@@ -1240,6 +1678,11 @@ service cloud.firestore {
       return signedIn()
         && anonymousOrActiveReporter(request.auth.uid)
         && validOpenEmergencyData(data)
+        && data.consentimientoGPS == true
+        && data.categoria in ['robo', 'sospecha', 'accidente', 'incendio']
+        && data.precisionMetros is number
+        && data.precisionMetros > 0
+        && data.precisionMetros < 5
         && data.creadorId == request.auth.uid
         && data.timestamp == request.time
         && throttle.uid == request.auth.uid
@@ -1275,7 +1718,11 @@ service cloud.firestore {
           'creadorId',
           'timestamp',
           'estado',
-          'atendidaAt'
+          'consentimientoGPS',
+          'atendidaAt',
+          'categoria',
+          'precisionMetros',
+          'detalle'
         ])
         && data.diff(resource.data).affectedKeys().hasOnly(['estado', 'atendidaAt'])
         && data.diff(resource.data).affectedKeys().hasAll(['estado', 'atendidaAt'])
@@ -1351,7 +1798,9 @@ service cloud.firestore {
       allow update: if validAdminAccountPromotion(uid)
         || validRoleRequestDecision()
         || validProfileUpdate(uid)
-        || validSelfLocationUpdate(uid)
+        || self(uid)
+        && activeUser()
+        && validSelfLocationUpdate(uid)
         || validAdminPatrolAssignment(uid)
         || validJoinProfile(uid)
         || validAccountDeactivation(uid)
@@ -1440,6 +1889,10 @@ service cloud.firestore {
     match /incidentes/{incidenteId} {
       allow read: if staffForCommunity(resource.data.get('comunidadId', null))
         || activeUser()
+          && resource.data.get('comunidadId', null) is string
+          && resource.data.comunidadId.size() > 0
+          && profile(request.auth.uid).comunidadId == resource.data.comunidadId
+        || activeUser()
           && request.auth.uid in resource.data.get('reporterUids', []);
       allow create: if activeUser() && validIncidentCreate(incidenteId);
 
@@ -1450,12 +1903,17 @@ service cloud.firestore {
         allow update, delete: if false;
       }
 
-      allow update: if validIncidentUpdate(incidenteId) || validIncidentCommunitySync();
+      allow update: if validIncidentUpdate(incidenteId)
+        || validIncidentCommunitySync()
+        || validIncidentGroupUpdate(incidenteId);
       allow delete: if false;
     }
 
     match /alertas/{alertaId} {
-      allow read: if activeUser()
+      allow get: if self(resource.data.creadorId)
+        || activeUser()
+          && profile(request.auth.uid).rol in ['seguridad', 'agente', 'administrador', 'admin'];
+      allow list: if activeUser()
         && profile(request.auth.uid).rol in ['seguridad', 'agente', 'administrador', 'admin'];
       allow create: if validOpenEmergencyCreate(alertaId);
       allow update: if validOpenEmergencyAssignment();
@@ -1473,7 +1931,7 @@ service cloud.firestore {
     }
 
     match /alertas_publicas/{alertaId} {
-      allow read: if canReadPublicAlert(resource.data);
+      allow read: if canReadPublicAlert(alertaId, resource.data);
       allow create: if activeUser() && validPublicAlertCreate(alertaId);
       allow update: if validPublicAlertUpdate(alertaId);
       allow delete: if false;
@@ -1491,6 +1949,17 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /logs/{logId} {
+      allow create: if validAuditLogCreate();
+      allow read: if staffForCommunity(resource.data.get('comunidadId', null));
+      allow update, delete: if false;
+    }
+
+    match /mensajes_salientes/{messageId} {
+      allow create: if validOutgoingContactMessage();
+      allow read, update, delete: if false;
+    }
+
     match /zonas/{comunidadId} {
       allow read: if sameCommunity(comunidadId);
       allow create, update: if validZoneWrite(comunidadId);
@@ -1498,15 +1967,25 @@ service cloud.firestore {
     }
 
     match /delegaciones/{delegacionId} {
-      allow read: if staffForCommunity(delegacionId) || activeDelegation();
+      allow read: if staffForCommunity(delegacionId)
+        || activeDelegation()
+        || neighborCanReadCommunityDelegation(delegacionId);
       allow create, update: if validDelegationWrite(delegacionId);
       allow delete: if false;
     }
 
     match /patrullas/{patrullaId} {
-      allow read: if staffForCommunity(resource.data.get('comunidadId', null));
+      allow get: if canReadAssignedPatrol(patrullaId)
+        || staffForCommunity(resource.data.get('comunidadId', null))
+        || reporterCanReadAssignedPatrol(patrullaId);
+      allow list: if staffForCommunity(resource.data.get('comunidadId', null));
       allow create: if validPatrolCreate(patrullaId);
-      allow update: if validPatrolUpdate(patrullaId);
+      allow update: if (activeUser()
+          && profile(request.auth.uid).rol in ['agente', 'seguridad']
+          && profile(request.auth.uid).patrullaId == patrullaId
+          && profile(request.auth.uid).comunidadId == resource.data.comunidadId
+          && validPatrolUpdate(patrullaId))
+        || adminOperator() && validPatrolUpdate(patrullaId);
       allow delete: if false;
     }
 

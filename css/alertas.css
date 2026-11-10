@@ -1,7 +1,3 @@
-/* =========================================================
-   COALERTA - ALERTAS.CSS
-========================================================= */
-
 .alerta-item {
     display: flex;
     gap: 15px;
@@ -32,6 +28,13 @@
     border-radius: 12px;
     background: #e8f7ed;
     color: #155e39;
+}
+
+.estado-respuesta-vecino.respuesta-vecino-en-camino {
+    border: 2px solid #1769aa;
+    background: #e8f3ff;
+    color: #12466f;
+    box-shadow: 0 4px 16px rgb(18 70 111 / 18%);
 }
 
 .estado-respuesta-vecino strong {
@@ -99,8 +102,10 @@
 }
 
 .btn-cancelar-alerta {
+    display: block;
     min-width: 150px;
     min-height: 48px;
+    margin: 0 auto;
     border: 0;
     border-radius: 10px;
     background: #b51f2b;
@@ -111,6 +116,10 @@
 }
 
 .estado-envio-alerta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
     margin: 12px 0;
     padding: 12px;
     border-radius: 10px;
@@ -123,6 +132,11 @@
     color: #17653f;
 }
 
+.estado-envio-success i {
+    color: #15803d;
+    font-size: 20px;
+}
+
 .estado-envio-error {
     background: #fff0ef;
     color: #9c2828;
@@ -131,6 +145,19 @@
 .estado-envio-info {
     background: #edf4fa;
     color: #295578;
+}
+
+.estado-envio-info i,
+.estado-envio-error i {
+    font-size: 18px;
+}
+
+.modal-alerta-btn:disabled,
+.boton-emergencia-flotante:disabled,
+.menu-inferior-mobile button:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+    filter: grayscale(0.35);
 }
 
 .alerta-item-icono {

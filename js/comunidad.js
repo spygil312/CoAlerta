@@ -1,12 +1,13 @@
-/* =========================================================
-   COALERTA - COMUNIDAD.JS
-========================================================= */
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import {
     collection,
     onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
+import {
+    configurarCierreSesion as configurarCierreSesionCompartido,
+    formatearRolVisible
+} from "./general.js?v=shared-core-20261106";
 
 let usuarioActual = null;
 let ubicacionCercanaActual = null;
@@ -37,11 +38,13 @@ const configuracionListas = {
     }
 };
 
-// =========================================================
-// 1. DETECCIÓN DE SESIÓN Y CARGA DE DATOS REALES
-// =========================================================
 document.addEventListener('DOMContentLoaded', () => {
-    configurarCierreSesion();
+    configurarCierreSesionCompartido({
+        auth,
+        signOut,
+        clearCachedSession: false,
+        replaceLocation: true
+    });
     Object.entries(configuracionListas).forEach(([clave, configuracion]) => {
         document.getElementById(configuracion.botonId)?.addEventListener('click', () => {
             mostrarListaCompleta(clave);
@@ -205,6 +208,8 @@ document.addEventListener('DOMContentLoaded', () => {
             mostrarMensajeEnContenedor(contenedor, 'No se pudieron cargar los comunicados.');
         }
     }
+
+    window.coalertaRenderizarAvisosOficiales = renderizarAvisosOficiales;
 
     let solicitudUbicacionActual = 0;
 
@@ -597,9 +602,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// =========================================================
-// 2. SUSCRIPCIONES EN TIEMPO REAL (FIRESTORE)
-// =========================================================
 function inicializarInterfazReal() {
     configurarSegunRol();
     actualizarDatosSidebar();
@@ -615,10 +617,9 @@ function inicializarInterfazReal() {
 
     cargarVecinosEnTiempoReal();
     cargarAnunciosEnTiempoReal();
-    renderizarAvisosOficiales();
+    window.coalertaRenderizarAvisosOficiales?.();
 }
 
-// Escucha cambios en tiempo real en la colección 'vecinos' de la comunidad
 function cargarVecinosEnTiempoReal() {
     const contenedor = document.getElementById('contenedor-vecinos');
     const data = window.coalertaData;
@@ -630,7 +631,6 @@ function cargarVecinosEnTiempoReal() {
     actualizarListaAmpliable('miembros', miembros, crearFilaMiembro, contenedor);
 }
 
-// Escucha anuncios en tiempo real creados por los miembros
 function cargarAnunciosEnTiempoReal() {
     const contenedor = document.getElementById('contenedor-anuncios');
     if (!contenedor || !usuarioActual || !usuarioActual.uid || !usuarioActual.comunidadId) return;
@@ -801,11 +801,6 @@ function crearFilaComunicado(aviso) {
     return articulo;
 }
 
-// =========================================================
-// 3. ACCIONES DE ESCRITURA REALES (INSERTAR / ELIMINAR)
-// =========================================================
-
-// Publicar un anuncio real en Firestore
 async function guardarAnuncio() {
     if (!usuarioActual || !usuarioActual.comunidadId) {
         alert('Primero debes pertenecer a una comunidad.');
@@ -832,7 +827,6 @@ async function guardarAnuncio() {
     }
 }
 
-// Eliminar un anuncio de la base de datos real
 async function borrarAnuncioReal(anuncioId) {
     if (confirm("¿Estás seguro de que deseas eliminar este anuncio permanentemente?")) {
         try {
@@ -844,7 +838,6 @@ async function borrarAnuncioReal(anuncioId) {
     }
 }
 
-// Generación de código de invitación real registrado en la DB
 async function abrirModal(id) {
     const modal = document.getElementById(id);
     if (!modal) return;
@@ -882,7 +875,6 @@ async function abrirModal(id) {
     modal.classList.add('activo');
 }
 
-// Unirse a una comunidad validando contra Firestore
 async function procesarUnion() {
     if (!usuarioActual) {
         alert('Espera a que se cargue tu perfil e inténtalo nuevamente.');
@@ -911,9 +903,6 @@ async function procesarUnion() {
     }
 }
 
-// =========================================================
-// 4. UTILIDADES
-// =========================================================
 function obtenerIniciales(nombre) {
     if (!nombre) return "U";
     const partes = nombre.trim().split(/\s+/).filter(Boolean);
@@ -958,29 +947,6 @@ function actualizarDatosSidebar() {
         imagen.hidden = false;
         if (icono) icono.hidden = true;
     }
-}
-
-function formatearRolVisible(usuario) {
-    const valor = String(usuario.rol || 'vecino').trim();
-    const normalizado = valor.toLocaleLowerCase();
-    const roleLabels = {
-        vecino: 'Vecino',
-        residente: 'Vecino',
-        coordinador: 'Coordinador vecinal',
-        seguridad: 'Personal de seguridad',
-        agente: 'Personal de seguridad'
-    };
-    const rol = roleLabels[normalizado] ||
-        (['vecino / residente', 'vecino/residente'].includes(normalizado)
-            ? 'Vecino'
-            : valor.charAt(0).toLocaleUpperCase() + valor.slice(1));
-    if (normalizado === 'vecino' && usuario.estadoSolicitudRol === 'pendiente' && usuario.rolSolicitud) {
-        const solicitado = usuario.rolSolicitud === 'coordinador'
-            ? 'Coordinador vecinal'
-            : usuario.rolSolicitud === 'seguridad' ? 'Personal de seguridad' : usuario.rolSolicitud;
-        return `${solicitado} (pendiente)`;
-    }
-    return rol;
 }
 
 function mostrarPerfilLocal() {
@@ -1071,7 +1037,7 @@ function verPerfilVecino(miembro) {
     }
     if (telefonoPerfil) {
         const telefono = String(miembro.telefono || '').trim();
-        telefonoPerfil.hidden = !/^\d{9}$/.test(telefono);
+        telefonoPerfil.hidden = !/^9\d{8}$/.test(telefono);
         telefonoPerfil.textContent = telefonoPerfil.hidden ? '' : `Llamar: ${telefono}`;
         telefonoPerfil.href = telefonoPerfil.hidden ? '' : `tel:${telefono}`;
     }
@@ -1089,20 +1055,4 @@ async function copiarCodigo() {
         console.error('No se pudo copiar el código:', error);
         alert(`Copia este código: ${codigo}`);
     }
-}
-
-function configurarCierreSesion() {
-    const boton = document.getElementById('btnCerrarSesionLateral');
-    if (!boton) return;
-
-    boton.addEventListener('click', async (evento) => {
-        evento.preventDefault();
-        try {
-            await signOut(auth);
-            window.location.replace('login.html');
-        } catch (error) {
-            console.error('Error al cerrar sesión:', error);
-            alert('No se pudo cerrar la sesión. Inténtalo nuevamente.');
-        }
-    });
 }

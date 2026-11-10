@@ -1,6 +1,6 @@
 import {
     collection, deleteDoc, doc, getDoc, getDocs, getDocsFromServer, limit, onSnapshot,
-    orderBy, query, runTransaction, serverTimestamp, setDoc, updateDoc, where
+    orderBy, query, runTransaction, serverTimestamp, setDoc, Timestamp, updateDoc, where
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
@@ -12,7 +12,7 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
     const DEFAULT_COMMUNITY_ID = "comunidad_general_1";
     const activeStates = new Set([
         "Recibido en servidor", "En revisión", "Derivada a Central",
-        "Auxilio en camino", "Agentes en sitio"
+        "Auxilio en camino", "Atendiendo", "Agentes en sitio"
     ]);
     const state = {
         uid: null,
@@ -53,6 +53,16 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
         return category;
     }
 
+    function categoryCode(value) {
+        const codes = {
+            robo: "ROBO_PROCESO",
+            sospecha: "PRESENCIA_SOSPECHOSA",
+            accidente: "ACCIDENTE",
+            incendio: "INCENDIO"
+        };
+        return codes[normalizeCategory(value)] || "";
+    }
+
     function distanceMeters(first, second) {
         if (![first.latitud, first.longitud, second.latitud, second.longitud].every(Number.isFinite)) {
             return Infinity;
@@ -85,7 +95,7 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
     }
 
     function stopListeners() {
-        state.listeners.forEach((unsubscribe) => unsubscribe());
+        state.listeners.slice().forEach((unsubscribe) => unsubscribe());
         state.listeners = [];
         if (state.delegationTimer !== null) {
             window.clearTimeout(state.delegationTimer);
@@ -132,8 +142,9 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
         }, Math.min(nextChange - now + 1, 2147483647));
     }
 
-    function reportListenerError(area, error) {
-        console.error(`No se pudo sincronizar ${area} desde Firebase:`, error);
+    function reportListenerError(area, error, severity = "error") {
+        const log = severity === "warn" ? console.warn : console.error;
+        log(`No se pudo sincronizar ${area} desde Firebase:`, error);
         let message = `No se pudo sincronizar ${area}. Inténtalo de nuevo más tarde.`;
         if (error.code === "permission-denied") {
             message = `No tienes permiso para consultar ${area}.`;
@@ -277,6 +288,7 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
 
     function watchMapPatrols() {
         if (state.patrolDataReady || !isMapPage()) return;
+        if (!state.isAdmin && !["coordinador", "agente", "seguridad"].includes(state.role)) return;
         const communityId = String(state.profile && state.profile.comunidadId || "").trim();
         if (!state.isAdmin && !communityId) return;
 
@@ -461,7 +473,8 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
                     }, (error) => {
                         state.delegationReady = true;
                         updateRoleNavigation(user, state.role, true);
-                        reportListenerError("delegación", error);
+                        watchPageData();
+                        reportListenerError("delegación", error, "warn");
                         dispatch("coalerta:delegacion-actualizada", null);
                     });
                     state.listeners.push(delegationUnsubscribe);
@@ -779,8 +792,11 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
                 ...(incident ? {
                     estado: incident.estado,
                     unidad: incident.unidad || null,
+                    patrullaId: incident.patrullaId || null,
                     vehiculo: incident.vehiculo || null,
                     etaMinutos: incident.etaMinutos || null,
+                    latitud: incident.latitud,
+                    longitud: incident.longitud,
                     motivoDescarte: incident.motivoDescarte || null,
                     resultado: incident.resultado || null,
                     derivadaAt: incident.derivadaAt || null,
@@ -795,6 +811,26 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
                 id
             };
         });
+    }
+
+    function watchAssignedPatrolLocation(patrolId, onUpdate) {
+        const id = String(patrolId || "").trim();
+        if (!id || typeof onUpdate !== "function") {
+            throw new TypeError("Se requiere una unidad asignada y una función para recibir su ubicación.");
+        }
+        const stopSnapshot = onSnapshot(doc(db, "patrullas", id), (snapshot) => {
+            onUpdate(snapshot.exists() ? normalizeDocument(snapshot) : null);
+        }, (error) => reportListenerError("ubicación de patrulla asignada", error));
+        let isActive = true;
+        const unsubscribe = () => {
+            if (!isActive) return;
+            isActive = false;
+            stopSnapshot();
+            const listenerIndex = state.listeners.indexOf(unsubscribe);
+            if (listenerIndex !== -1) state.listeners.splice(listenerIndex, 1);
+        };
+        state.listeners.push(unsubscribe);
+        return unsubscribe;
     }
 
     async function savePreferences(preferences) {
@@ -822,6 +858,7 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
             throw new Error("Inicia sesión con una cuenta activa para reportar una emergencia.");
         }
         const categoria = normalizeCategory(alert.tipo || alert.categoria);
+        const codigoCategoria = categoryCode(categoria);
         const categories = {
             robo: "Robo",
             sospecha: "Sospecha",
@@ -829,6 +866,12 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
             incendio: "Incendio"
         };
         if (!categories[categoria]) throw new Error("Selecciona una categoría de alerta válida.");
+        if (alert.codigoCategoria !== codigoCategoria) {
+            throw new Error("El código de categoría de la alerta no es válido.");
+        }
+        if (alert.consentimientoGPS !== true) {
+            throw new Error("Debes aceptar el uso de tu ubicación GPS para enviar el reporte.");
+        }
         const detalle = typeof alert.detalle === "string" ? alert.detalle.trim() : "";
         const latitud = Number(alert.latitud);
         const longitud = Number(alert.longitud);
@@ -838,8 +881,8 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
             !Number.isFinite(longitud) || longitud < -180 || longitud > 180) {
             throw new Error("La ubicación GPS no es válida.");
         }
-        if (!Number.isFinite(precisionMetros) || precisionMetros <= 0 || precisionMetros > 100000) {
-            throw new Error("La precisión GPS informada no es válida.");
+        if (!Number.isFinite(precisionMetros) || precisionMetros <= 0 || precisionMetros >= 5) {
+            throw new Error("La precisión GPS debe ser menor a 5 metros.");
         }
 
         const coordinatorNeedsCommunity = effectiveRole() === "coordinador" && !state.profile.comunidadId;
@@ -849,32 +892,60 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
         if (coordinatorNeedsCommunity) {
             await synchronizeOwnIncidentsToCommunity(user.uid, communityId);
         }
-        const incidentRef = doc(collection(db, "incidentes"));
-        const publicRef = doc(db, "alertas_publicas", incidentRef.id);
-        const ownAlertRef = doc(db, "usuarios", user.uid, "alertas", incidentRef.id);
         const throttleRef = doc(db, "usuarios", user.uid, "limites", "reportes_emergencia");
         const reportTimestamp = serverTimestamp();
         const tipo = categories[categoria];
         const prioridad = categoria === "sospecha" ? "Media" : "Alta";
-        const incident = {
-            id: incidentRef.id,
-            tipo,
-            categoria,
-            detalle,
-            latitud,
-            longitud,
-            precisionMetros,
-            prioridad,
-            estado: "Recibido en servidor",
-            timestamp: reportTimestamp,
-            reportes: 1,
-            reporterUids: [user.uid],
-            comunidadId: communityId,
-            ultimaActualizacion: reportTimestamp
-        };
+        const groupWindowMs = 3 * 60 * 1000;
+        const maxGroupReporters = 50;
+        let groupCandidate = null;
+        if (communityId) {
+            const recentIncidents = await getDocs(query(
+                collection(db, "incidentes"),
+                where("comunidadId", "==", communityId),
+                where("timestamp", ">=", Timestamp.fromMillis(Date.now() - groupWindowMs)),
+                orderBy("timestamp", "desc"),
+                limit(100)
+            ));
+            groupCandidate = recentIncidents.docs
+                .map((snapshot) => ({ ref: snapshot.ref, data: snapshot.data() }))
+                .filter((candidate) => {
+                    const reporters = candidate.data.reporterUids;
+                    const createdAt = candidate.data.timestamp;
+                    const createdAtMs = createdAt && typeof createdAt.toMillis === "function"
+                        ? createdAt.toMillis()
+                        : NaN;
+                    return candidate.data.categoria === categoria
+                        && ["Recibido en servidor", "En revisión", "Derivada a Central"]
+                            .includes(candidate.data.estado)
+                        && Array.isArray(reporters)
+                        && reporters.length < maxGroupReporters
+                        && !reporters.includes(user.uid)
+                        && Number.isFinite(createdAtMs)
+                        && Date.now() >= createdAtMs
+                        && Date.now() - createdAtMs < groupWindowMs
+                        && distanceMeters(candidate.data, { latitud, longitud }) < 50;
+                })
+                .sort((first, second) =>
+                    distanceMeters(first.data, { latitud, longitud }) -
+                    distanceMeters(second.data, { latitud, longitud })
+                )[0] || null;
+        }
 
-        await runTransaction(db, async (transaction) => {
+        const newIncidentRef = doc(collection(db, "incidentes"));
+        const newPublicRef = doc(db, "alertas_publicas", newIncidentRef.id);
+        const newOwnAlertRef = doc(db, "usuarios", user.uid, "alertas", newIncidentRef.id);
+        const result = await runTransaction(db, async (transaction) => {
             const throttleSnapshot = await transaction.get(throttleRef);
+            let groupSnapshot = null;
+            let groupPublicSnapshot = null;
+            let groupPublicRef = null;
+            if (groupCandidate) {
+                groupSnapshot = await transaction.get(groupCandidate.ref);
+                groupPublicRef = doc(db, "alertas_publicas", groupCandidate.ref.id);
+                groupPublicSnapshot = await transaction.get(groupPublicRef);
+            }
+
             if (throttleSnapshot.exists()) {
                 const lastReport = throttleSnapshot.data().ultimaAlertaAt;
                 const elapsedMs = lastReport && typeof lastReport.toMillis === "function"
@@ -891,8 +962,97 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
                     ultimaAlertaAt: serverTimestamp()
                 });
             }
-            transaction.set(incidentRef, incident);
-            transaction.set(publicRef, {
+
+            if (groupSnapshot && groupSnapshot.exists() &&
+                groupPublicSnapshot && groupPublicSnapshot.exists()) {
+                const current = groupSnapshot.data();
+                const reporters = current.reporterUids;
+                const createdAt = current.timestamp;
+                const createdAtMs = createdAt && typeof createdAt.toMillis === "function"
+                    ? createdAt.toMillis()
+                    : NaN;
+                const distance = distanceMeters(current, { latitud, longitud });
+                const canJoin = current.comunidadId === communityId
+                    && current.categoria === categoria
+                    && ["Recibido en servidor", "En revisión", "Derivada a Central"]
+                        .includes(current.estado)
+                    && Array.isArray(reporters)
+                    && reporters.length < maxGroupReporters
+                    && !reporters.includes(user.uid)
+                    && Number.isFinite(createdAtMs)
+                    && Date.now() >= createdAtMs
+                    && Date.now() - createdAtMs < groupWindowMs
+                    && distance < 50;
+                if (canJoin) {
+                    const groupedIncident = {
+                        ...current,
+                        reportes: Number(current.reportes) + 1,
+                        reporterUids: [...reporters, user.uid],
+                        ultimaAgrupacionLatitud: latitud,
+                        ultimaAgrupacionLongitud: longitud,
+                        ultimaAgrupacionAt: reportTimestamp,
+                        ultimaAgrupacionUid: user.uid,
+                        ultimaAgrupacionCategoria: categoria,
+                        ultimaActualizacion: reportTimestamp
+                    };
+                    transaction.update(groupCandidate.ref, {
+                        reportes: groupedIncident.reportes,
+                        reporterUids: groupedIncident.reporterUids,
+                        ultimaAgrupacionLatitud: latitud,
+                        ultimaAgrupacionLongitud: longitud,
+                        ultimaAgrupacionAt: reportTimestamp,
+                        ultimaAgrupacionUid: user.uid,
+                        ultimaAgrupacionCategoria: categoria,
+                        ultimaActualizacion: reportTimestamp
+                    });
+                    transaction.set(groupPublicRef, makePublicAlert(groupedIncident), { merge: true });
+                    transaction.set(doc(db, "usuarios", user.uid, "alertas", groupCandidate.ref.id), {
+                        alertaId: groupCandidate.ref.id,
+                        tipo: current.tipo,
+                        categoria: current.categoria,
+                        latitud: current.latitud,
+                        longitud: current.longitud,
+                        precisionMetros: current.precisionMetros,
+                        timestamp: reportTimestamp,
+                        estado: current.estado,
+                        prioridad: current.prioridad,
+                        unidad: current.unidad || null,
+                        vehiculo: current.vehiculo || null,
+                        etaMinutos: current.etaMinutos || null,
+                        motivoDescarte: current.motivoDescarte || null,
+                        emisorUid: user.uid,
+                        ultimaActualizacion: reportTimestamp,
+                        detalle: current.detalle
+                    });
+                    return { incidentId: groupCandidate.ref.id, agrupada: true, reportes: groupedIncident.reportes };
+                }
+            }
+
+            const incident = {
+                id: newIncidentRef.id,
+                tipo,
+                categoria,
+                codigoCategoria,
+                consentimientoGPS: true,
+                detalle,
+                latitud,
+                longitud,
+                precisionMetros,
+                prioridad,
+                estado: "Recibido en servidor",
+                timestamp: reportTimestamp,
+                reportes: 1,
+                reporterUids: [user.uid],
+                comunidadId: communityId,
+                ultimaActualizacion: reportTimestamp,
+                ultimaAgrupacionLatitud: latitud,
+                ultimaAgrupacionLongitud: longitud,
+                ultimaAgrupacionAt: reportTimestamp,
+                ultimaAgrupacionUid: user.uid,
+                ultimaAgrupacionCategoria: categoria
+            };
+            transaction.set(newIncidentRef, incident);
+            transaction.set(newPublicRef, {
                 tipo,
                 categoria,
                 latitud: Number(latitud.toFixed(3)),
@@ -904,8 +1064,8 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
                 ultimaActualizacion: reportTimestamp,
                 comunidadId: incident.comunidadId
             });
-            transaction.set(ownAlertRef, {
-                alertaId: incidentRef.id,
+            transaction.set(newOwnAlertRef, {
+                alertaId: newIncidentRef.id,
                 tipo,
                 categoria,
                 latitud,
@@ -922,9 +1082,10 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
                 ultimaActualizacion: reportTimestamp,
                 detalle
             });
+            return { incidentId: newIncidentRef.id, agrupada: false, reportes: 1 };
         });
 
-        return { incidentId: incidentRef.id, agrupada: false, reportes: 1 };
+        return result;
     }
 
     async function transitionIncident(incidentId, action, payload = {}) {
@@ -947,6 +1108,25 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
         const publicRef = doc(db, "alertas_publicas", id);
         const ratingRef = doc(db, "incidentes", id, "calificaciones", user.uid);
         const userAlertRef = doc(db, "usuarios", user.uid, "alertas", id);
+        const auditLogRef = doc(collection(db, "logs"));
+
+        let patrolRef = null;
+        let patrolSnapshot = null;
+        if (["dispatch", "onsite", "close"].includes(action)) {
+            let patrolId;
+            if (action === "dispatch") {
+                patrolId = String(payload.patrullaId || profile.patrullaId || "").trim();
+            } else {
+                const incidentForPatrol = await getDoc(incidentRef);
+                if (!incidentForPatrol.exists()) throw new Error("No se encontró el incidente.");
+                patrolId = String(incidentForPatrol.get("patrullaId") || "").trim();
+            }
+            if (!patrolId || patrolId.length > 80) {
+                throw new Error("El incidente no tiene un identificador de patrulla válido.");
+            }
+            patrolRef = doc(db, "patrullas", patrolId);
+            patrolSnapshot = await getDoc(patrolRef);
+        }
 
         const result = await runTransaction(db, async (transaction) => {
             const incidentSnapshot = await transaction.get(incidentRef);
@@ -992,8 +1172,6 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
             }
 
             let changes;
-            let patrolRef = null;
-            let patrolSnapshot = null;
             if (action === "validate" && current.estado === "Recibido en servidor") {
                 changes = {
                     estado: "Derivada a Central",
@@ -1018,9 +1196,8 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
                 if (!["administrador", "admin"].includes(state.role) && patrolId !== profile.patrullaId) {
                     throw new Error("Solo puedes despachar la unidad asignada a tu perfil.");
                 }
-                patrolRef = doc(db, "patrullas", patrolId);
-                patrolSnapshot = await transaction.get(patrolRef);
-                if (!patrolSnapshot.exists()) {
+                if (!patrolRef || patrolRef.id !== patrolId ||
+                    !patrolSnapshot || !patrolSnapshot.exists()) {
                     throw new Error("No se encontró el registro operativo de la patrulla. Comparte nuevamente la ubicación GPS de la unidad.");
                 }
                 if (patrolSnapshot.get("estado") !== "Disponible") {
@@ -1051,9 +1228,9 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
                     current.patrullaId !== profile.patrullaId) {
                     throw new Error("Solo la unidad asignada puede marcar su llegada.");
                 }
-                patrolRef = doc(db, "patrullas", current.patrullaId);
-                patrolSnapshot = await transaction.get(patrolRef);
-                if (!patrolSnapshot.exists() || patrolSnapshot.get("estado") !== "Despachado" ||
+                if (!patrolRef || patrolRef.id !== current.patrullaId ||
+                    !patrolSnapshot || !patrolSnapshot.exists() ||
+                    patrolSnapshot.get("estado") !== "Despachado" ||
                     patrolSnapshot.get("incidenteId") !== id) {
                     throw new Error("La unidad no está despachada a este incidente.");
                 }
@@ -1061,8 +1238,10 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
                 const updatedAt = patrol.updatedAt;
                 if (!updatedAt || typeof updatedAt.toMillis !== "function" ||
                     Date.now() - updatedAt.toMillis() > 2 * 60 * 1000 ||
-                    distanceMeters(current, patrol) > Math.max(30, Number(patrol.precisionMetros) || 0)) {
-                    throw new Error("La ubicación GPS de la unidad no es reciente o aún está lejos del incidente.");
+                    !Number.isFinite(Number(patrol.precisionMetros)) ||
+                    Number(patrol.precisionMetros) >= 15 ||
+                    distanceMeters(current, patrol) >= 15) {
+                    throw new Error("La ubicación GPS debe ser reciente, tener precisión menor a 15 m y estar a menos de 15 m del incidente.");
                 }
                 changes = { estado: "Agentes en sitio", enSitioAt: serverTimestamp() };
             } else if (action === "close" && current.estado === "Agentes en sitio") {
@@ -1071,15 +1250,14 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
                     current.patrullaId !== profile.patrullaId) {
                     throw new Error("Solo la unidad asignada puede cerrar este incidente.");
                 }
-                patrolRef = doc(db, "patrullas", current.patrullaId);
-                patrolSnapshot = await transaction.get(patrolRef);
-                if (!patrolSnapshot.exists() || patrolSnapshot.get("estado") !== "En sitio" ||
+                if (!patrolRef || patrolRef.id !== current.patrullaId ||
+                    !patrolSnapshot || !patrolSnapshot.exists() ||
+                    patrolSnapshot.get("estado") !== "En sitio" ||
                     patrolSnapshot.get("incidenteId") !== id) {
                     throw new Error("La unidad no figura en sitio para este incidente.");
                 }
                 const outcome = String(payload.outcome || "");
-                if (!["Intervención preventiva", "Sujeto intervenido", "Falsa alarma",
-                    "Persona detenida", "Sin novedad"].includes(outcome)) {
+                if (!["Delincuente retenido", "Intervención preventiva", "Falsa alarma"].includes(outcome)) {
                     throw new TypeError("Selecciona un resultado válido para el incidente.");
                 }
                 changes = {
@@ -1095,6 +1273,16 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
             const updatedAt = serverTimestamp();
             const updated = { ...current, ...changes, ultimaActualizacion: updatedAt };
             transaction.update(incidentRef, { ...changes, ultimaActualizacion: updatedAt });
+            registrarLogAuditoria(
+                transaction,
+                auditLogRef,
+                id,
+                action,
+                user.uid,
+                obtenerCoordenadasAuditoria(action, patrolSnapshot, current),
+                current,
+                changes
+            );
             transaction.set(publicRef, makePublicAlert(updated), { merge: true });
             if (patrolRef && patrolSnapshot) {
                 const patrolChanges = action === "dispatch"
@@ -1131,12 +1319,48 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
         return result;
     }
 
+    function obtenerCoordenadasAuditoria(action, patrolSnapshot, incident) {
+        const location = ["dispatch", "onsite", "close"].includes(action) && patrolSnapshot
+            ? patrolSnapshot.data()
+            : incident;
+        const latitud = Number(location && location.latitud);
+        const longitud = Number(location && location.longitud);
+        if (!Number.isFinite(latitud) || latitud < -90 || latitud > 90 ||
+            !Number.isFinite(longitud) || longitud < -180 || longitud > 180) {
+            throw new Error("No hay coordenadas válidas para registrar la auditoría.");
+        }
+        return { latitud, longitud };
+    }
+
+    function registrarLogAuditoria(
+        transaction,
+        logRef,
+        alertaId,
+        accion,
+        usuarioId,
+        coordenadas,
+        incidente,
+        cambios
+    ) {
+        // La retención de dos años requiere configurar Firestore TTL sobre expiresAt;
+        // este comentario no configura ni garantiza por sí solo esa política.
+        transaction.set(logRef, {
+            alertaId,
+            operadorId: usuarioId,
+            patrullaId: cambios.patrullaId || incidente.patrullaId || null,
+            accion,
+            coordenadas,
+            comunidadId: incidente.comunidadId,
+            createdAt: serverTimestamp()
+        });
+    }
+
     async function publishOfficialNotice(template, incidentId) {
         const { user, profile } = requireRole(["coordinador", "administrador", "admin"]);
         const allowedTemplates = [
-            "Emergencia canalizada",
-            "Sujeto retenido por autoridades",
-            "Zona segura",
+            "Emergencia Canalizada",
+            "Sujeto Retenido por Autoridades",
+            "Zona Segura",
             "Falsa alarma aclarada por autoridades"
         ];
         if (!allowedTemplates.includes(template)) throw new TypeError("Selecciona una plantilla oficial válida.");
@@ -1150,6 +1374,7 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
             if (!snapshot.exists()) throw new Error("No se encontró el incidente seleccionado.");
             const incident = snapshot.data();
             const allowedResults = [
+                "Delincuente retenido",
                 "Persona detenida",
                 "Falsa alarma",
                 "Intervención preventiva",
@@ -1296,7 +1521,7 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
         if (!memberSnapshot.exists()) return;
         const nombre = String(profile.nombre || "").trim();
         const telefono = String(profile.telefono || "").trim();
-        if (!nombre || !/^\d{9}$/.test(telefono)) {
+        if (!nombre || !/^9\d{8}$/.test(telefono)) {
             throw new Error("El nombre o teléfono del perfil no es válido para actualizar el contacto comunitario.");
         }
         if (memberSnapshot.get("nombre") === nombre && memberSnapshot.get("telefono") === telefono) return;
@@ -1350,7 +1575,7 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
     }
 
     async function saveCoverageZone(zone) {
-        const { user, profile } = requireRole(["coordinador"]);
+        const { user, profile } = requireRole(["coordinador", "administrador", "admin"]);
         const comunidadId = String(profile.comunidadId || "");
         const latitud = Number(zone && zone.latitud);
         const longitud = Number(zone && zone.longitud);
@@ -1587,11 +1812,24 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
             telefono: String(contact && contact.telefono || "").trim()
         }));
         if (sanitized.some((contact) => !contact.nombre || contact.nombre.length > 80 ||
-            !/^\d{9}$/.test(contact.telefono))) {
-            throw new TypeError("Cada contacto debe tener un nombre y un celular válido de 9 dígitos.");
+            !/^9\d{8}$/.test(contact.telefono))) {
+            throw new TypeError("Cada contacto debe tener un nombre y un celular válido que empiece con 9 y tenga 9 dígitos.");
         }
-        await setDoc(doc(db, "usuarios", user.uid), { contactosEmergencia: sanitized }, { merge: true });
-        return { ok: true, notificationSent: false };
+        const profileRef = doc(db, "usuarios", user.uid);
+        const outgoingMessageRefs = sanitized.map(() => doc(collection(db, "mensajes_salientes")));
+        await runTransaction(db, async (transaction) => {
+            transaction.set(profileRef, { contactosEmergencia: sanitized }, { merge: true });
+            sanitized.forEach((contact, index) => {
+                transaction.set(outgoingMessageRefs[index], {
+                    ...contact,
+                    usuarioId: user.uid,
+                    tipo: "asignacion_contacto_emergencia",
+                    estado: "pendiente",
+                    creadoEn: serverTimestamp()
+                });
+            });
+        });
+        return { ok: true, notificationSent: false, notificationQueued: sanitized.length };
     }
 
     async function deactivateAccount(dni) {
@@ -1621,6 +1859,7 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
         getAlerts,
         getIncidents,
         getMyAlerts,
+        watchAssignedPatrolLocation,
         getNotices: () => state.notices.slice().sort((first, second) =>
             new Date(second.timestamp || 0) - new Date(first.timestamp || 0)
         ),
@@ -1633,6 +1872,7 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
         savePreferences,
         isActive: (alert) => activeStates.has(alert.estado),
         normalizeCategory,
+        categoryCode,
         distanceMeters,
         createAlert,
         refreshAlerts,

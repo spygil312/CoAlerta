@@ -1,16 +1,9 @@
 :root {
-    font-family: Inter, sans-serif;
-    color: #172b2a;
-    background: #f3f6f7;
     font-synthesis: none;
     text-rendering: optimizeLegibility;
 }
 
-* { box-sizing: border-box; }
-
-body { margin: 0; min-width: 320px; min-height: 100vh; }
-
-button, a { font: inherit; }
+body { min-width: 320px; }
 
 .seguridad-main { width: 100%; margin: 0; padding: 30px; }
 
@@ -110,6 +103,31 @@ button, a { font: inherit; }
 .seguridad-patrol-marker { color: #1267d6; font-size: 24px; line-height: 20px; text-align: center; text-shadow: 0 1px 3px #fff; }
 .seguridad-map-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .seguridad-hint { min-height: 18px; margin: 9px 0 0; color: #657574; font-size: 12px; line-height: 1.5; }
+.seguridad-google-maps-link {
+    display: inline-flex;
+    align-items: center;
+    margin: 8px 0 2px;
+    padding: 8px 12px;
+    border: 1px solid #0b57d0;
+    border-radius: 7px;
+    background: #0b57d0;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.4;
+    text-decoration: none;
+}
+.seguridad-google-maps-link:hover,
+.seguridad-google-maps-link:focus-visible {
+    border-color: #0842a0;
+    background: #0842a0;
+    color: #fff;
+    text-decoration: underline;
+}
+.seguridad-google-maps-link:focus-visible {
+    outline: 3px solid rgba(11, 87, 208, .3);
+    outline-offset: 2px;
+}
 
 @media (max-width: 1100px) {
     .seguridad-grid { grid-template-columns: 1fr; }

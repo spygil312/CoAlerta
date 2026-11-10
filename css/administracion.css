@@ -138,6 +138,98 @@
     display: none;
 }
 
+.administracion-sla-panel {
+    margin-bottom: 22px;
+}
+
+.administracion-sla-cabecera {
+    align-items: flex-start;
+}
+
+.administracion-sla-cabecera h2,
+.administracion-sla-comparativa h3 {
+    color: var(--texto);
+    font-size: 18px;
+}
+
+.administracion-sla-cabecera p,
+.administracion-sla-nota {
+    margin-top: 6px;
+    color: var(--texto-secundario);
+    font-size: 13px;
+}
+
+.administracion-sla-total {
+    display: grid;
+    justify-items: end;
+    gap: 4px;
+    white-space: nowrap;
+}
+
+.administracion-sla-total strong {
+    color: var(--texto);
+    font-size: 24px;
+}
+
+.administracion-sla-total span {
+    color: var(--texto-secundario);
+    font-size: 11px;
+}
+
+.administracion-sla-comparativa {
+    padding: 18px 20px;
+}
+
+.administracion-sla-comparativa h3 {
+    margin-bottom: 14px;
+    font-size: 15px;
+}
+
+.administracion-sla-lista {
+    display: grid;
+    gap: 10px;
+}
+
+.administracion-sla-fila {
+    display: grid;
+    grid-template-columns: minmax(130px, 1fr) minmax(100px, 2fr) minmax(110px, auto);
+    align-items: center;
+    gap: 12px;
+    font-size: 12px;
+}
+
+.administracion-sla-etiqueta {
+    overflow: hidden;
+    color: var(--texto-secundario);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.administracion-sla-pista {
+    display: block;
+    height: 9px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--fondo-2);
+}
+
+.administracion-sla-barra {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--verde-principal);
+}
+
+.administracion-sla-fila strong {
+    color: var(--texto);
+    text-align: right;
+    white-space: nowrap;
+}
+
+.administracion-sla-nota {
+    padding: 0 20px 18px;
+}
+
 .administracion-panel-cabecera {
     display: flex;
     align-items: center;
@@ -174,6 +266,32 @@
     gap: 18px;
     padding: 18px 20px;
     border-bottom: 1px solid var(--borde);
+}
+
+.administracion-sla-cabecera {
+    flex-direction: column;
+}
+
+.administracion-sla-total {
+    justify-items: start;
+}
+
+.administracion-sla-comparativa {
+    padding: 16px;
+}
+
+.administracion-sla-fila {
+    grid-template-columns: minmax(90px, .8fr) minmax(60px, 1fr);
+    gap: 6px 10px;
+}
+
+.administracion-sla-fila strong {
+    grid-column: 2;
+    text-align: left;
+}
+
+.administracion-sla-nota {
+    padding: 0 16px 16px;
 }
 
 .administracion-solicitud:last-child {

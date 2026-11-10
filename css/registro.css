@@ -1,7 +1,3 @@
-/* =========================================================
-   COALERTA - REGISTRO.CSS
-========================================================= */
-
 .pagina-registro {
     min-height: 100vh;
     background: var(--fondo);
@@ -167,15 +163,6 @@
     display: none;
 }
 
-.volver-inicio {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: var(--texto-secundario);
-    font-size: 14px;
-    margin-bottom: 30px;
-}
-
 .registro-formulario-header {
     margin-bottom: 30px;
 }
@@ -209,22 +196,6 @@
     gap: 18px;
 }
 
-.grupo-formulario {
-    display: flex;
-    flex-direction: column;
-}
-
-.grupo-formulario label {
-    font-size: 13px;
-    font-weight: 600;
-    margin-bottom: 7px;
-    color: var(--texto);
-}
-
-.input-con-icono {
-    position: relative;
-}
-
 .input-con-icono input,
 .input-con-icono select {
     width: 100%;
@@ -241,17 +212,6 @@
     top: 50%;
     transform: translateY(-50%);
     color: var(--texto-secundario);
-}
-
-.ver-password {
-    position: absolute;
-    right: 15px;
-    top: 50%;
-    transform: translateY(-50%);
-    background: none;
-    border: none;
-    color: var(--texto-secundario);
-    cursor: pointer;
 }
 
 .registro-terminos {
@@ -316,33 +276,6 @@
     margin-top: 25px;
 }
 
-.login-separador::before,
-.login-separador::after {
-    content: "";
-    flex: 1;
-    height: 1px;
-    background: var(--borde);
-}
-
-.btn-google {
-    width: 100%;
-    padding: 13px;
-    border: 1px solid var(--borde);
-    border-radius: 10px;
-    background: var(--blanco);
-    color: var(--texto);
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    transition: 0.2s;
-}
-
-.btn-google:hover {
-    background: var(--fondo);
-}
-
 .registro-login {
     text-align: center;
     margin-top: 25px;
@@ -353,17 +286,6 @@
     color: var(--verde-principal);
     font-weight: 600;
     text-decoration: none;
-}
-
-.login-aviso {
-    margin-top: 25px;
-    text-align: center;
-    font-size: 13px;
-    color: var(--texto-secundario);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
 }
 
 @media (max-width: 900px) {

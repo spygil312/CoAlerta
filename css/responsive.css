@@ -1,7 +1,3 @@
-/* =========================================================
-   COALERTA - RESPONSIVE.CSS (VERSIÓN OPTIMIZADA)
-========================================================= */
-
 @media (max-width: 1200px) {
     .contenedor { width: min(94%, 1100px); }
     .hero-contenido { gap: 45px; }

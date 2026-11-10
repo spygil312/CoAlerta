@@ -1,12 +1,13 @@
-/* =========================================================
-   COALERTA - PERFIL.JS
-========================================================= */
 import {
     EmailAuthProvider, GoogleAuthProvider, onAuthStateChanged, reauthenticateWithCredential,
     reauthenticateWithPopup, sendEmailVerification, signOut, updateEmail, updateProfile, updatePassword
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
+import {
+    configurarCierreSesion,
+    establecerTexto
+} from "./general.js?v=shared-core-20261106";
 
 document.addEventListener("DOMContentLoaded", function () {
     const formPerfil = document.getElementById("formPerfil");
@@ -20,15 +21,20 @@ document.addEventListener("DOMContentLoaded", function () {
     const inputTelefono = document.getElementById("telefono");
     const botonFoto = document.getElementById("btnCambiarFoto");
     const inputFoto = document.getElementById("inputFoto");
-    const botonCerrarSesion = document.getElementById("btnCerrarSesion");
-    const botonCerrarSesionLateral = document.getElementById("btnCerrarSesionLateral");
     const botonesMostrarPassword = document.querySelectorAll(".ver-password");
     const usuarioGuardado = leerUsuarioGuardado();
 
     mostrarUsuario(usuarioGuardado);
     configurarPreferencias();
     configurarMostrarContrasenas();
-    configurarCierreSesion();
+    configurarCierreSesion({
+        auth,
+        signOut,
+        buttonIds: ["btnCerrarSesion", "btnCerrarSesionLateral"],
+        confirmationMessage: "¿Seguro que deseas cerrar sesión?",
+        clearCachedSession: true,
+        disableWhileSigningOut: true
+    });
 
     if (inputTelefono) {
         inputTelefono.addEventListener("input", function () {
@@ -202,11 +208,6 @@ document.addEventListener("DOMContentLoaded", function () {
         if (campo) campo.value = valor;
     }
 
-    function establecerTexto(id, texto) {
-        const elemento = document.getElementById(id);
-        if (elemento) elemento.textContent = texto;
-    }
-
     function establecerRol(rol) {
         const selector = document.getElementById("rol");
         const resumen = document.getElementById("resumenRol");
@@ -350,8 +351,8 @@ document.addEventListener("DOMContentLoaded", function () {
             mostrarMensaje(mensajePerfil, "Ingresa un correo electrónico válido.", "error");
             return;
         }
-        if (!/^\d{9}$/.test(telefono)) {
-            mostrarMensaje(mensajePerfil, "El número de celular debe tener 9 dígitos.", "error");
+        if (!/^9\d{8}$/.test(telefono)) {
+            mostrarMensaje(mensajePerfil, "El número de celular debe empezar con 9 y tener 9 dígitos.", "error");
             return;
         }
 
@@ -460,8 +461,8 @@ document.addEventListener("DOMContentLoaded", function () {
         }));
         for (const contacto of contactos) {
             if (!contacto.nombre && !contacto.telefono) continue;
-            if (!contacto.nombre || !/^\d{9}$/.test(contacto.telefono)) {
-                mostrarMensaje(mensajeContactos, "Ingrese nombre y un número celular válido de 9 dígitos para cada contacto.", "error");
+            if (!contacto.nombre || !/^9\d{8}$/.test(contacto.telefono)) {
+                mostrarMensaje(mensajeContactos, "Ingrese nombre y un número celular válido que empiece con 9 y tenga 9 dígitos para cada contacto.", "error");
                 return;
             }
         }
@@ -478,7 +479,7 @@ document.addEventListener("DOMContentLoaded", function () {
             guardarUsuarioEnNavegador(usuario);
             mostrarMensaje(
                 mensajeContactos,
-                "Contactos guardados. No se envió un SMS de asignación; la integración de mensajería está pendiente.",
+                "Contactos guardados. La notificación quedó registrada en la cola; el SMS no se envía hasta integrar un servicio de mensajería.",
                 "correcto"
             );
         } catch (error) {
@@ -739,28 +740,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
     function guardarPreferenciasLocales(uid, preferences) {
         localStorage.setItem(preferenceStorageKey(uid), JSON.stringify(preferences));
-    }
-
-    function configurarCierreSesion() {
-        [botonCerrarSesion, botonCerrarSesionLateral].forEach((boton) => {
-            if (!boton) return;
-            boton.addEventListener("click", async function () {
-                if (!window.confirm("¿Seguro que deseas cerrar sesión?")) return;
-                boton.disabled = true;
-                try {
-                    if (typeof auth !== "undefined" && auth.currentUser) {
-                        await signOut(auth);
-                    }
-                    localStorage.removeItem("coalerta_usuario");
-                    localStorage.removeItem("coalertaSesion");
-                    window.location.href = "login.html";
-                } catch (error) {
-                    console.error("No se pudo cerrar la sesión:", error);
-                    window.alert("No se pudo cerrar la sesión. Inténtalo nuevamente.");
-                    boton.disabled = false;
-                }
-            });
-        });
     }
 
     function mostrarMensaje(elemento, texto, tipo) {
