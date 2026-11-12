@@ -12,10 +12,13 @@ import {
 let usuarioActual = null;
 let ubicacionCercanaActual = null;
 let serviciosOpenStreetMap = 0;
+let lugaresServiciosOpenStreetMap = [];
+let lugaresImportantesOpenStreetMap = [];
 let avisosExpiryTimer = null;
 let stopWatchingAnnouncements = null;
 let watchingAnnouncementsUid = null;
 let watchingAnnouncementsCommunityId = null;
+let solicitudPerfilVecino = 0;
 const listasAmpliables = new Map();
 const configuracionListas = {
     miembros: {
@@ -28,13 +31,29 @@ const configuracionListas = {
         contenedorId: 'contenedor-anuncios',
         botonId: 'btn-ver-todos-anuncios',
         titulo: 'Anuncios de la comunidad',
-        vacio: 'No hay anuncios publicados.'
+        vacio: 'No hay anuncios publicados.',
+        maxVisible: 1
     },
     comunicados: {
         contenedorId: 'listaAvisosOficiales',
         botonId: 'btn-ver-todos-comunicados',
         titulo: 'Comunicados oficiales',
-        vacio: 'No hay comunicados oficiales para tu comunidad.'
+        vacio: 'No hay comunicados oficiales para tu comunidad.',
+        maxVisible: 1
+    },
+    serviciosCercanos: {
+        contenedorId: 'listaServiciosCercanos',
+        botonId: 'btn-ver-servicios-cercanos',
+        titulo: 'Comisarías, Serenazgo y personal activo',
+        vacio: 'No se encontraron comisarías, bases de Serenazgo ni personal activo.',
+        maxVisible: 2
+    },
+    lugaresCercanos: {
+        contenedorId: 'listaLugaresCercanos',
+        botonId: 'btn-ver-lugares-cercanos',
+        titulo: 'Zonas y lugares importantes',
+        vacio: 'No se encontraron centros de salud, municipalidades ni estaciones de bomberos.',
+        maxVisible: 3
     }
 };
 
@@ -221,6 +240,13 @@ document.addEventListener('DOMContentLoaded', () => {
     function buscarLugaresCercanos(forzarActualizacion = false) {
         const solicitud = ++solicitudUbicacionActual;
         const boton = document.getElementById('btnActualizarUbicacion');
+        lugaresServiciosOpenStreetMap = [];
+        lugaresImportantesOpenStreetMap = [];
+        serviciosOpenStreetMap = 0;
+        ubicacionCercanaActual = null;
+        establecerTextoCercano('contadorServiciosSeguridad', 0);
+        establecerTextoCercano('contadorZonas', 0);
+        establecerTextoCercano('contadorLugares', 0);
         establecerEstadoUbicacion('Solicitando tu ubicación actual...', 'cargando');
         establecerListaCercana('listaServiciosCercanos', 'Buscando comisarías y serenazgo cercanos...');
         establecerListaCercana('listaLugaresCercanos', 'Buscando zonas y lugares cercanos...');
@@ -235,7 +261,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (solicitud !== solicitudUbicacionActual) return;
             const latitud = ubicacion.latitud;
             const longitud = ubicacion.longitud;
-            establecerEstadoUbicacion('Buscando servicios y lugares a menos de 5 km...', 'cargando');
+            establecerEstadoUbicacion('Buscando servicios y lugares a menos de 3 km...', 'cargando');
 
             try {
                 actualizarNombreArea(latitud, longitud, solicitud).catch((error) => {
@@ -250,7 +276,10 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (error) {
                 if (solicitud !== solicitudUbicacionActual) return;
                 console.error('No se pudieron consultar los lugares cercanos en OpenStreetMap:', error);
-                mostrarErrorUbicacion('No se pudieron cargar los lugares cercanos. Comprueba tu conexión e inténtalo nuevamente.');
+                mostrarErrorUbicacion(
+                    'No se pudieron cargar los lugares cercanos porque los servidores de mapas no respondieron. Pulsa “Actualizar ubicación” para intentarlo de nuevo.',
+                    { causa: 'red' }
+                );
                 renderizarPersonalSeguridadCercano();
             } finally {
                 if (solicitud === solicitudUbicacionActual && boton) boton.disabled = false;
@@ -262,47 +291,224 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    async function consultarOpenStreetMap(latitud, longitud) {
-        const radio = 5000;
-        const entorno = (filtro) => `nwr(around:${radio},${latitud},${longitud})${filtro};`;
-        const consulta = [
-            '[out:json][timeout:12];',
-            '(',
-            entorno('["amenity"="police"]'),
-            entorno('["name"~"serenazgo|seguridad ciudadana|comisaria|polic[ií]a",i]'),
-            entorno('["leisure"~"park|playground"]'),
-            entorno('["amenity"~"school|hospital|clinic|doctors|community_centre|marketplace"]'),
-            entorno('["place"~"neighbourhood|suburb|quarter|village"]'),
-            ');out center tags;'
-        ].join('');
-        const servidores = [
-            'https://overpass.kumi.systems/api/interpreter',
-            'https://overpass-api.de/api/interpreter'
-        ];
-        let ultimoError;
+    // ---------------------------------------------------------------------
+    // Búsqueda de lugares cercanos (comisarías, salud, bomberos, municipalidad)
+    // Orden de intentos:
+    //   1) Overpass (varios espejos, escalonados, por POST)
+    //   2) Caché antigua de la misma zona (si existe)
+    //   3) Nominatim (búsqueda por categoría, una consulta por segundo)
+    // ---------------------------------------------------------------------
+    const RADIO_BUSQUEDA_METROS = 3000;
+    const VIGENCIA_CACHE_MS = 30 * 60 * 1000;
+    const TIEMPO_MAXIMO_OVERPASS_MS = 20000;
+    const RETARDO_ENTRE_ESPEJOS_MS = 1500;
+    const SERVIDORES_OVERPASS = [
+        'https://overpass-api.de/api/interpreter',
+        'https://overpass.private.coffee/api/interpreter',
+        'https://overpass.kumi.systems/api/interpreter',
+        'https://overpass.openstreetmap.fr/api/interpreter'
+    ];
+    const CATEGORIAS_NOMINATIM = ['police', 'hospital', 'clinic', 'fire_station', 'townhall'];
 
-        for (const servidor of servidores) {
-            const controlador = new AbortController();
-            const temporizador = window.setTimeout(() => controlador.abort(), 8000);
-            try {
-                const respuesta = await fetch(servidor, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
-                    body: `data=${encodeURIComponent(consulta)}`,
-                    signal: controlador.signal
-                });
-                if (!respuesta.ok) throw new Error(`OpenStreetMap respondió con estado ${respuesta.status}.`);
-                const datos = await respuesta.json();
-                if (!Array.isArray(datos.elements)) throw new Error('La respuesta de OpenStreetMap no contiene lugares.');
+    function pausa(ms, senal) {
+        return new Promise((resolve, reject) => {
+            if (senal && senal.aborted) {
+                reject(new DOMException('Cancelado', 'AbortError'));
+                return;
+            }
+            const temporizador = window.setTimeout(resolve, ms);
+            if (senal) {
+                senal.addEventListener('abort', () => {
+                    window.clearTimeout(temporizador);
+                    reject(new DOMException('Cancelado', 'AbortError'));
+                }, { once: true });
+            }
+        });
+    }
+
+    // fetch + comprobación de estado + lectura del JSON, todo dentro del mismo
+    // límite de tiempo. El motivo del aborto queda en el mensaje del error
+    // ("Tiempo de espera agotado") en vez de "signal is aborted without reason".
+    async function pedirJson(url, opciones = {}, tiempoMaximoMs = 15000, senalExterna = null) {
+        const controlador = new AbortController();
+        const cancelar = () => controlador.abort(senalExterna && senalExterna.reason);
+        if (senalExterna) {
+            if (senalExterna.aborted) cancelar();
+            else senalExterna.addEventListener('abort', cancelar, { once: true });
+        }
+        const temporizador = window.setTimeout(() => {
+            controlador.abort(new DOMException('Tiempo de espera agotado', 'TimeoutError'));
+        }, tiempoMaximoMs);
+        try {
+            const respuesta = await fetch(url, { ...opciones, signal: controlador.signal });
+            if (!respuesta.ok) throw new Error(`${new URL(url).host} respondió con estado ${respuesta.status}.`);
+            return await respuesta.json();
+        } finally {
+            window.clearTimeout(temporizador);
+            if (senalExterna) senalExterna.removeEventListener('abort', cancelar);
+        }
+    }
+
+    function construirConsultaOverpass(latitud, longitud, radio) {
+        // "nwr" = nodos + vías + relaciones. Muchas comisarías y hospitales están
+        // dibujados como edificios (vías), por eso antes no aparecían.
+        // Se usan filtros exactos (="valor") y no expresiones regulares (~), que
+        // son bastante más lentas y hacían que Overpass se pasara del tiempo.
+        const alrededor = `(around:${radio},${latitud},${longitud})`;
+        const filtros = [
+            '["amenity"="police"]',
+            '["amenity"="hospital"]',
+            '["amenity"="clinic"]',
+            '["amenity"="fire_station"]',
+            '["emergency"="fire_station"]',
+            '["amenity"="townhall"]'
+        ];
+        return `[out:json][timeout:25];(${filtros.map((f) => `nwr${f}${alrededor};`).join('')});out center tags 200;`;
+    }
+
+    function leerCacheLugares(clave, aceptarVencida) {
+        try {
+            const cache = JSON.parse(sessionStorage.getItem(clave) || 'null');
+            if (!cache || !Array.isArray(cache.elements) || !Number.isFinite(cache.timestamp)) return null;
+            const antiguedad = Date.now() - cache.timestamp;
+            if (antiguedad < 0) return null;
+            if (aceptarVencida || antiguedad < VIGENCIA_CACHE_MS) return cache.elements;
+        } catch (error) {
+            console.warn('No se pudo leer la caché temporal de lugares cercanos:', error);
+        }
+        return null;
+    }
+
+    function guardarCacheLugares(clave, elements) {
+        if (!Array.isArray(elements) || elements.length === 0) return; // no guardar resultados vacíos
+        try {
+            sessionStorage.setItem(clave, JSON.stringify({ timestamp: Date.now(), elements }));
+        } catch (error) {
+            console.warn('No se pudo guardar la caché temporal de lugares cercanos:', error);
+        }
+    }
+
+    // Lanza los espejos de Overpass de forma escalonada: el primero arranca de
+    // inmediato, el segundo 1,5 s después si el primero aún no respondió, etc.
+    // El primero que devuelve datos válidos gana y cancela a los demás.
+    async function consultarOverpass(latitud, longitud) {
+        const consulta = construirConsultaOverpass(latitud, longitud, RADIO_BUSQUEDA_METROS);
+        const grupo = new AbortController();
+        try {
+            return await Promise.any(SERVIDORES_OVERPASS.map(async (servidor, indice) => {
+                await pausa(indice * RETARDO_ENTRE_ESPEJOS_MS, grupo.signal);
+                const datos = await pedirJson(
+                    servidor,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+                        body: `data=${encodeURIComponent(consulta)}`
+                    },
+                    TIEMPO_MAXIMO_OVERPASS_MS,
+                    grupo.signal
+                );
+                if (!Array.isArray(datos.elements)) {
+                    throw new Error(`${servidor} no devolvió una lista de lugares.`);
+                }
+                // Overpass sobrecargado a veces responde 200 con el aviso en "remark".
+                if (typeof datos.remark === 'string' && /runtime error|timed out|out of memory/i.test(datos.remark)) {
+                    throw new Error(`${servidor}: ${datos.remark}`);
+                }
                 return datos.elements;
+            }));
+        } catch (error) {
+            // Promise.any lanza un AggregateError; se registra el motivo de cada espejo.
+            if (error instanceof AggregateError) {
+                error.errors.forEach((motivo, indice) =>
+                    console.warn(`Overpass (${SERVIDORES_OVERPASS[indice]}) falló:`, motivo && motivo.message || motivo)
+                );
+            }
+            throw error;
+        } finally {
+            grupo.abort(new DOMException('Consulta finalizada', 'AbortError')); // cancela los espejos que sigan en curso
+        }
+    }
+
+    // Respaldo: Nominatim con búsqueda por categoría dentro de un recuadro (viewbox).
+    // Su política de uso pide como máximo 1 solicitud por segundo, por eso es secuencial.
+    async function consultarNominatimPorCategoria(latitud, longitud) {
+        const deltaLatitud = RADIO_BUSQUEDA_METROS / 111320;
+        const deltaLongitud = RADIO_BUSQUEDA_METROS / (111320 * Math.max(0.1, Math.cos(latitud * Math.PI / 180)));
+        const viewbox = [
+            longitud - deltaLongitud, latitud + deltaLatitud,
+            longitud + deltaLongitud, latitud - deltaLatitud
+        ].join(',');
+
+        const elementos = [];
+        let exitosas = 0;
+        for (let i = 0; i < CATEGORIAS_NOMINATIM.length; i += 1) {
+            if (i > 0) await pausa(1100);
+            const categoria = CATEGORIAS_NOMINATIM[i];
+            const parametros = new URLSearchParams({
+                format: 'jsonv2',
+                amenity: categoria,
+                viewbox,
+                bounded: '1',
+                limit: '20',
+                'accept-language': 'es'
+            });
+            try {
+                const datos = await pedirJson(
+                    `https://nominatim.openstreetmap.org/search?${parametros}`,
+                    {},
+                    10000
+                );
+                if (!Array.isArray(datos)) throw new Error('Nominatim no devolvió una lista.');
+                exitosas += 1;
+                datos.forEach((resultado) => {
+                    elementos.push({
+                        type: resultado.osm_type || 'nominatim',
+                        id: resultado.osm_id || `${categoria}:${resultado.lat}:${resultado.lon}`,
+                        lat: Number(resultado.lat),
+                        lon: Number(resultado.lon),
+                        tags: {
+                            amenity: resultado.type || categoria,
+                            name: resultado.name || (resultado.display_name || '').split(',')[0]
+                        }
+                    });
+                });
             } catch (error) {
-                ultimoError = error;
-                console.warn(`No respondió el servicio de mapas ${servidor}:`, error);
-            } finally {
-                window.clearTimeout(temporizador);
+                console.warn(`Nominatim no respondió para "${categoria}":`, error && error.message || error);
             }
         }
-        throw ultimoError || new Error('No hay servicios de mapas disponibles.');
+        if (exitosas === 0) throw new Error('Nominatim no respondió a ninguna consulta.');
+        return elementos;
+    }
+
+    async function consultarOpenStreetMap(latitud, longitud) {
+        const claveCache = `coalerta_lugares_osm:${latitud.toFixed(3)}:${longitud.toFixed(3)}`;
+
+        const cacheVigente = leerCacheLugares(claveCache, false);
+        if (cacheVigente) return cacheVigente;
+
+        try {
+            const elementos = await consultarOverpass(latitud, longitud);
+            guardarCacheLugares(claveCache, elementos);
+            return elementos;
+        } catch (errorOverpass) {
+            console.warn('Overpass no respondió en ningún servidor; se usará un respaldo:', errorOverpass);
+        }
+
+        const cacheAntigua = leerCacheLugares(claveCache, true);
+        if (cacheAntigua) {
+            console.warn('Se muestran resultados guardados anteriormente para esta zona.');
+            return cacheAntigua;
+        }
+
+        establecerEstadoUbicacion('Los servidores principales están lentos. Probando una búsqueda alternativa…', 'cargando');
+        try {
+            const elementos = await consultarNominatimPorCategoria(latitud, longitud);
+            guardarCacheLugares(claveCache, elementos);
+            return elementos;
+        } catch (errorNominatim) {
+            console.warn('El respaldo de Nominatim tampoco respondió:', errorNominatim);
+            throw new Error('No respondieron los servidores de OpenStreetMap (Overpass ni Nominatim).');
+        }
     }
 
     async function actualizarNombreArea(latitud, longitud, solicitud) {
@@ -342,8 +548,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function mostrarLugaresCercanos(elementos, latitud, longitud) {
         const servicios = [];
-        const zonas = [];
-        const lugares = [];
+        const lugaresImportantes = [];
         const vistos = new Set();
 
         elementos.forEach((elemento) => {
@@ -371,121 +576,139 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (detalle.tipo === 'serenazgo' || detalle.tipo === 'comisaria') {
                 servicios.push(detalle);
-            } else if (detalle.tipo === 'zona') {
-                zonas.push(detalle);
-            } else {
-                lugares.push(detalle);
+            } else if (['salud', 'municipalidad', 'bomberos'].includes(detalle.tipo)) {
+                lugaresImportantes.push(detalle);
             }
         });
 
         servicios.sort((a, b) => a.distancia - b.distancia);
-        zonas.sort((a, b) => a.distancia - b.distancia);
-        lugares.sort((a, b) => a.distancia - b.distancia);
+        lugaresImportantes.sort((a, b) => a.distancia - b.distancia);
 
-        const cantidadServicios = servicios.length;
-        serviciosOpenStreetMap = cantidadServicios;
-        const lugaresConZona = [...zonas, ...lugares].sort((a, b) => a.distancia - b.distancia);
-        renderizarListaCercana('listaServiciosCercanos', servicios.slice(0, 6), 'servicio');
-        renderizarListaCercana('listaLugaresCercanos', lugaresConZona.slice(0, 8), 'lugar');
-        establecerTextoCercano('contadorServiciosSeguridad', cantidadServicios);
-        establecerTextoCercano('contadorZonas', zonas.length);
-        establecerTextoCercano('contadorLugares', lugares.length);
-    }
-
-    function renderizarPersonalSeguridadCercano() {
-        const contenedor = document.getElementById('listaServiciosCercanos');
-        const data = window.coalertaData;
-        if (!contenedor || !data || !data.isReady()) return;
-
-        contenedor.querySelectorAll('[data-miembro-seguridad]').forEach((elemento) => elemento.remove());
-        const miembros = data.getCommunityMembers()
-            .filter((miembro) => miembro.rol === 'seguridad')
-            .sort((primero, segundo) => String(primero.nombre || '').localeCompare(String(segundo.nombre || ''), 'es'));
-
-        let personalCercanoCompartiendoUbicacion = 0;
-        miembros.forEach((miembro) => {
-            const actualizado = miembro.ubicacionActualizadaAt
-                ? new Date(miembro.ubicacionActualizadaAt).getTime()
-                : NaN;
-            const tieneUbicacion = miembro.ubicacionCompartida === true &&
-                Date.now() - actualizado <= 2 * 60 * 1000 &&
-                Number.isFinite(Number(miembro.latitud)) &&
-                Number.isFinite(Number(miembro.longitud));
-            const distancia = tieneUbicacion && ubicacionCercanaActual
-                ? distanciaEnMetros(
-                    ubicacionCercanaActual.latitud,
-                    ubicacionCercanaActual.longitud,
-                    Number(miembro.latitud),
-                    Number(miembro.longitud)
-                )
-                : null;
-            if (distancia !== null && distancia > 5000) return;
-            if (tieneUbicacion) personalCercanoCompartiendoUbicacion += 1;
-
-            const fila = document.createElement('article');
-            fila.className = 'item-autoridad card-interna';
-            fila.dataset.miembroSeguridad = miembro.uid || miembro.id;
-
-            const icono = document.createElement('div');
-            icono.className = 'autoridad-icono';
-            const iconoI = document.createElement('i');
-            iconoI.className = 'fa-solid fa-user-shield';
-            iconoI.setAttribute('aria-hidden', 'true');
-            icono.appendChild(iconoI);
-
-            const info = document.createElement('div');
-            info.className = 'autoridad-info';
-            const titulo = document.createElement('h4');
-            titulo.textContent = miembro.nombre || 'Personal de serenazgo';
-            const descripcion = document.createElement('p');
-            descripcion.textContent = tieneUbicacion
-                ? `Personal de serenazgo · ${distancia === null ? 'Ubicación compartida' : formatearDistancia(distancia)}`
-                : 'Personal de serenazgo · Ubicación no compartida';
-            info.append(titulo, descripcion);
-            fila.append(icono, info);
-
-            if (tieneUbicacion) {
-                const enlace = document.createElement('a');
-                enlace.className = 'enlace-lugar-cercano';
-                enlace.href = `mapa.html?lat=${encodeURIComponent(miembro.latitud)}&lng=${encodeURIComponent(miembro.longitud)}`;
-                enlace.textContent = 'Ver mapa';
-                enlace.setAttribute('aria-label', `Ver la ubicación compartida de ${titulo.textContent} en el mapa`);
-                fila.appendChild(enlace);
-            }
-            contenedor.appendChild(fila);
-        });
+        lugaresServiciosOpenStreetMap = servicios;
+        lugaresImportantesOpenStreetMap = lugaresImportantes;
+        guardarLugaresParaMapa([...servicios, ...lugaresImportantes]);
+        serviciosOpenStreetMap = servicios.length;
         establecerTextoCercano(
-            'contadorServiciosSeguridad',
-            serviciosOpenStreetMap + personalCercanoCompartiendoUbicacion
+            'contadorZonas',
+            lugaresImportantes.filter((lugar) =>
+                ['municipalidad', 'bomberos'].includes(lugar.tipo)
+            ).length
+        );
+        establecerTextoCercano(
+            'contadorLugares',
+            lugaresImportantes.filter((lugar) => lugar.tipo === 'salud').length
         );
     }
 
+    // Deja los centros de salud y comisarías encontrados disponibles para el
+    // panel de mapa (pages/mapa.html), que los dibuja como marcadores.
+    // Solo se guardan en esta pestaña (sessionStorage), igual que la ubicación.
+    function guardarLugaresParaMapa(lugares) {
+        try {
+            const tiposEnMapa = ['salud', 'comisaria', 'serenazgo'];
+            const compactos = lugares
+                .filter((lugar) => tiposEnMapa.includes(lugar.tipo))
+                .map((lugar) => ({
+                    nombre: lugar.nombre,
+                    tipo: lugar.tipo,
+                    latitud: lugar.latitud,
+                    longitud: lugar.longitud
+                }));
+            sessionStorage.setItem('coalerta_lugares_mapa', JSON.stringify({
+                timestamp: Date.now(),
+                lugares: compactos
+            }));
+        } catch (error) {
+            console.warn('No se pudieron guardar los lugares cercanos para el mapa:', error);
+        }
+    }
+
+    function crearEnlaceMapa(elemento) {
+        const parametros = new URLSearchParams({
+            lat: String(elemento.latitud),
+            lng: String(elemento.longitud)
+        });
+        if (!elemento.esPersonal) {
+            parametros.set('tipo', elemento.tipo || 'lugar');
+            parametros.set('nombre', String(elemento.nombre || '').slice(0, 120));
+        }
+        return `mapa.html?${parametros.toString()}`;
+    }
+
+    function renderizarPersonalSeguridadCercano() {
+        const data = window.coalertaData;
+        const miembros = data && data.isReady()
+            ? data.getCommunityMembers()
+                .filter((miembro) => miembro.rol === 'seguridad' &&
+                    (miembro.estado === 'Activo' || miembro.activo === true))
+                .map((miembro) => {
+                    const actualizado = obtenerMilisegundos(miembro.ubicacionActualizadaAt);
+                    const latitud = Number(miembro.latitud);
+                    const longitud = Number(miembro.longitud);
+                    const tieneUbicacion = miembro.ubicacionCompartida === true &&
+                        Number.isFinite(actualizado) && Date.now() >= actualizado &&
+                        Date.now() - actualizado <= 2 * 60 * 1000 &&
+                        Number.isFinite(latitud) && latitud >= -90 && latitud <= 90 &&
+                        Number.isFinite(longitud) && longitud >= -180 && longitud <= 180;
+                    const distancia = tieneUbicacion && ubicacionCercanaActual
+                        ? distanciaEnMetros(
+                            ubicacionCercanaActual.latitud,
+                            ubicacionCercanaActual.longitud,
+                            latitud,
+                            longitud
+                        )
+                        : null;
+                    return {
+                        nombre: miembro.nombre || 'Personal de serenazgo',
+                        tipo: 'serenazgo',
+                        distancia,
+                        latitud: tieneUbicacion ? latitud : null,
+                        longitud: tieneUbicacion ? longitud : null,
+                        esPersonal: true,
+                        tieneUbicacion
+                    };
+                })
+                .filter((miembro) => miembro.distancia === null || miembro.distancia <= 5000)
+            : [];
+        miembros.sort((primero, segundo) =>
+            (primero.distancia ?? Infinity) - (segundo.distancia ?? Infinity)
+        );
+        const servicios = [...lugaresServiciosOpenStreetMap, ...miembros]
+            .sort((primero, segundo) =>
+                (primero.distancia ?? Infinity) - (segundo.distancia ?? Infinity)
+            );
+        renderizarListaCercana('listaServiciosCercanos', servicios, 'servicio');
+        renderizarListaCercana('listaLugaresCercanos', lugaresImportantesOpenStreetMap, 'lugar');
+        establecerTextoCercano('contadorServiciosSeguridad', serviciosOpenStreetMap + miembros.length);
+    }
+
     function clasificarLugarCercano(etiquetas, nombre) {
-        if (/serenazgo/i.test(nombre)) return 'serenazgo';
-        if (etiquetas.amenity === 'police') return 'comisaria';
-        if (etiquetas.place) return 'zona';
-        if (etiquetas.leisure === 'park' || etiquetas.leisure === 'playground') return 'parque';
-        if (['hospital', 'clinic', 'doctors'].includes(etiquetas.amenity)) return 'salud';
-        if (etiquetas.amenity === 'school') return 'educacion';
-        if (etiquetas.amenity === 'community_centre') return 'comunidad';
-        if (etiquetas.amenity === 'marketplace') return 'mercado';
-        return 'lugar';
+        if (/serenazgo|seguridad ciudadana/i.test(nombre)) return 'serenazgo';
+        if (etiquetas.amenity === 'police' ||
+            /comisar[ií]a|polic[ií]a|PNP/i.test(nombre)) return 'comisaria';
+        if (etiquetas.amenity === 'townhall' || etiquetas.government === 'municipality' ||
+            /municipalidad|municipio/i.test(nombre)) return 'municipalidad';
+        if (etiquetas.amenity === 'fire_station' || etiquetas.emergency === 'fire_station' ||
+            /bomberos|estaci[oó]n de bomberos/i.test(nombre)) return 'bomberos';
+        if (['hospital', 'clinic', 'doctors'].includes(etiquetas.amenity) ||
+            ['hospital', 'clinic', 'health_post', 'doctor'].includes(etiquetas.healthcare) ||
+            /posta|centro de salud/i.test(nombre)) return 'salud';
+        return null;
     }
 
     function renderizarListaCercana(id, elementos, tipoLista) {
         const contenedor = document.getElementById(id);
         if (!contenedor) return;
-        contenedor.replaceChildren();
+        const clave = tipoLista === 'servicio' ? 'serviciosCercanos' : 'lugaresCercanos';
+        actualizarListaAmpliable(
+            clave,
+            elementos,
+            (elemento) => crearFilaLugarCercano(elemento, tipoLista),
+            contenedor
+        );
+    }
 
-        if (!elementos.length) {
-            const mensaje = tipoLista === 'servicio'
-                ? 'OpenStreetMap no tiene comisarías o puntos de serenazgo registrados cerca de esta ubicación.'
-                : 'No se encontraron zonas ni lugares importantes registrados en los alrededores.';
-            agregarMensajeCercano(contenedor, mensaje);
-            return;
-        }
-
-        elementos.forEach((elemento) => {
+    function crearFilaLugarCercano(elemento, tipoLista) {
             const fila = document.createElement('article');
             fila.className = tipoLista === 'servicio'
                 ? 'item-autoridad card-interna'
@@ -502,15 +725,29 @@ document.addEventListener('DOMContentLoaded', () => {
             const titulo = document.createElement('h4');
             titulo.textContent = elemento.nombre;
             const descripcion = document.createElement('p');
-            descripcion.textContent = `${etiquetaTipoLugar(elemento.tipo)} · ${formatearDistancia(elemento.distancia)}`;
+            const detalleDistancia = Number.isFinite(elemento.distancia)
+                ? formatearDistancia(elemento.distancia)
+                : elemento.esPersonal
+                    ? 'Ubicación no compartida'
+                    : '';
+            descripcion.textContent = detalleDistancia
+                ? `${elemento.esPersonal ? 'Personal activo' : etiquetaTipoLugar(elemento.tipo)} · ${detalleDistancia}`
+                : etiquetaTipoLugar(elemento.tipo);
             info.append(titulo, descripcion);
 
+            const tieneCoordenadas = Number.isFinite(elemento.latitud) &&
+                Number.isFinite(elemento.longitud);
+            if (!tieneCoordenadas) {
+                fila.append(icono, info);
+                return fila;
+            }
             const enlace = document.createElement('a');
             enlace.className = tipoLista === 'servicio' ? 'enlace-lugar-cercano' : 'icono-flecha';
-            enlace.href = `https://www.openstreetmap.org/?mlat=${elemento.latitud}&mlon=${elemento.longitud}#map=17/${elemento.latitud}/${elemento.longitud}`;
-            enlace.target = '_blank';
-            enlace.rel = 'noopener noreferrer';
-            enlace.setAttribute('aria-label', `Ver ${elemento.nombre} en OpenStreetMap`);
+            // Se abre en el panel de mapa de CoAlerta (misma pestaña), no en OpenStreetMap.
+            enlace.href = crearEnlaceMapa(elemento);
+            enlace.setAttribute('aria-label', elemento.esPersonal
+                ? `Ver la ubicación compartida de ${elemento.nombre} en el mapa`
+                : `Ver ${elemento.nombre} en el mapa de CoAlerta`);
             if (tipoLista === 'servicio') {
                 enlace.textContent = 'Ver mapa';
             } else {
@@ -520,20 +757,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 enlace.appendChild(flecha);
             }
             fila.append(icono, info, enlace);
-            contenedor.appendChild(fila);
-        });
+            return fila;
+    }
+
+    function obtenerMilisegundos(valor) {
+        if (valor && typeof valor.toMillis === 'function') return valor.toMillis();
+        if (valor && typeof valor.toDate === 'function') return valor.toDate().getTime();
+        const fecha = new Date(valor || 0).getTime();
+        return Number.isFinite(fecha) ? fecha : NaN;
     }
 
     function obtenerIconoLugar(tipo) {
         const iconos = {
             serenazgo: 'fa-user-shield',
             comisaria: 'fa-shield-halved',
-            parque: 'fa-tree',
             salud: 'fa-kit-medical',
-            educacion: 'fa-school',
-            comunidad: 'fa-people-group',
-            mercado: 'fa-store',
-            zona: 'fa-map-location-dot'
+            municipalidad: 'fa-landmark',
+            bomberos: 'fa-fire-extinguisher'
         };
         return iconos[tipo] || 'fa-location-dot';
     }
@@ -542,31 +782,28 @@ document.addEventListener('DOMContentLoaded', () => {
         const etiquetas = {
             serenazgo: 'Serenazgo',
             comisaria: 'Comisaría / policía',
-            parque: 'Parque o zona recreativa',
             salud: 'Centro de salud',
-            educacion: 'Centro educativo',
-            comunidad: 'Centro comunitario',
-            mercado: 'Mercado',
-            zona: 'Zona o localidad',
+            municipalidad: 'Municipalidad',
+            bomberos: 'Estación de bomberos',
             lugar: 'Lugar importante'
         };
         return etiquetas[tipo] || etiquetas.lugar;
     }
 
     function distanciaEnMetros(lat1, lon1, lat2, lon2) {
-        const radianes = (grados) => grados * Math.PI / 180;
-        const diferenciaLat = radianes(lat2 - lat1);
-        const diferenciaLon = radianes(lon2 - lon1);
-        const a = Math.sin(diferenciaLat / 2) ** 2 +
-            Math.cos(radianes(lat1)) * Math.cos(radianes(lat2)) *
-            Math.sin(diferenciaLon / 2) ** 2;
-        return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        const [primeraLatitud, primeraLongitud, segundaLatitud, segundaLongitud] =
+            [lat1, lon1, lat2, lon2].map(Number);
+        if (![primeraLatitud, primeraLongitud, segundaLatitud, segundaLongitud]
+            .every(Number.isFinite)) return NaN;
+
+        return window.coalertaData.distanceMeters(
+            { latitud: primeraLatitud, longitud: primeraLongitud },
+            { latitud: segundaLatitud, longitud: segundaLongitud }
+        );
     }
 
     function formatearDistancia(metros) {
-        return metros < 1000
-            ? `${Math.round(metros)} m`
-            : `${(metros / 1000).toLocaleString('es', { maximumFractionDigits: 1 })} km`;
+        return window.coalertaFormatearDistancia(metros);
     }
 
     function establecerEstadoUbicacion(mensaje, estado) {
@@ -578,7 +815,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function establecerListaCercana(id, mensaje) {
         const contenedor = document.getElementById(id);
-        if (contenedor) agregarMensajeCercano(contenedor, mensaje);
+        if (!contenedor) return;
+        const entrada = Object.entries(configuracionListas)
+            .find(([, configuracion]) => configuracion.contenedorId === id);
+        if (entrada) {
+            actualizarListaAmpliable(entrada[0], [], () => document.createElement('span'), contenedor);
+        }
+        agregarMensajeCercano(contenedor, mensaje);
     }
 
     function agregarMensajeCercano(contenedor, mensaje) {
@@ -593,10 +836,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (elemento) elemento.textContent = String(texto);
     }
 
-    function mostrarErrorUbicacion(mensaje) {
+    function mostrarErrorUbicacion(mensaje, { causa = 'permiso' } = {}) {
         establecerEstadoUbicacion(mensaje, 'error');
-        establecerListaCercana('listaServiciosCercanos', 'Activa el permiso de ubicación y pulsa “Actualizar ubicación” para volver a buscar.');
-        establecerListaCercana('listaLugaresCercanos', 'Los resultados dependen del permiso de ubicación y de los datos disponibles en OpenStreetMap.');
+        if (causa === 'red') {
+            establecerListaCercana('listaServiciosCercanos', 'No se pudo consultar el mapa en este momento. Pulsa “Actualizar ubicación” para reintentar.');
+            establecerListaCercana('listaLugaresCercanos', 'No se pudo consultar el mapa en este momento. Pulsa “Actualizar ubicación” para reintentar.');
+        } else {
+            establecerListaCercana('listaServiciosCercanos', 'Activa el permiso de ubicación y pulsa “Actualizar ubicación” para volver a buscar.');
+            establecerListaCercana('listaLugaresCercanos', 'Los resultados dependen del permiso de ubicación y de los datos disponibles en OpenStreetMap.');
+        }
         const boton = document.getElementById('btnActualizarUbicacion');
         if (boton) boton.disabled = false;
     }
@@ -683,7 +931,8 @@ function actualizarListaAmpliable(clave, elementos, crearElemento, contenedor) {
     contenedor.replaceChildren();
     const boton = document.getElementById(configuracion.botonId);
     if (boton) {
-        boton.hidden = lista.length <= 3;
+        const maxVisible = configuracion.maxVisible || 3;
+        boton.hidden = lista.length <= maxVisible;
         boton.textContent = `Ver todos (${lista.length})`;
         boton.setAttribute('aria-label', `Ver todos los ${configuracion.titulo.toLocaleLowerCase()}`);
     }
@@ -694,7 +943,8 @@ function actualizarListaAmpliable(clave, elementos, crearElemento, contenedor) {
         contenedor.append(vacio);
         return;
     }
-    lista.slice(0, 3).forEach((elemento) => contenedor.append(crearElemento(elemento)));
+    lista.slice(0, configuracion.maxVisible || 3)
+        .forEach((elemento) => contenedor.append(crearElemento(elemento)));
 }
 
 function mostrarListaCompleta(clave) {
@@ -1013,13 +1263,16 @@ function mostrarMensajeEnContenedor(contenedor, mensaje) {
     contenedor.appendChild(parrafo);
 }
 
-function verPerfilVecino(miembro) {
+async function verPerfilVecino(miembro) {
     const nombre = miembro.nombre || 'Vecino';
     const nombrePerfil = document.getElementById('perfil-nombre');
     const rolPerfil = document.getElementById('perfil-rol');
     const inicialesPerfil = document.getElementById('perfil-iniciales');
     const fechaIngreso = document.getElementById('perfil-fecha-ingreso');
     const telefonoPerfil = document.getElementById('perfil-telefono');
+    const contactosPerfil = document.getElementById('perfil-contactos-emergencia');
+    const listaContactos = document.getElementById('perfil-lista-contactos-emergencia');
+    const solicitudActual = ++solicitudPerfilVecino;
     if (nombrePerfil) nombrePerfil.textContent = nombre || 'Vecino';
     if (rolPerfil) rolPerfil.textContent = miembro.rol === 'seguridad'
         ? 'Personal de serenazgo'
@@ -1041,7 +1294,53 @@ function verPerfilVecino(miembro) {
         telefonoPerfil.textContent = telefonoPerfil.hidden ? '' : `Llamar: ${telefono}`;
         telefonoPerfil.href = telefonoPerfil.hidden ? '' : `tel:${telefono}`;
     }
+    if (contactosPerfil) contactosPerfil.hidden = true;
+    if (listaContactos) listaContactos.replaceChildren();
     document.getElementById('modal-perfil-vecino')?.classList.add('activo');
+
+    if (!['coordinador', 'seguridad'].includes(obtenerRolEfectivo()) ||
+        !contactosPerfil || !listaContactos) return;
+
+    contactosPerfil.hidden = false;
+    const estadoContactos = document.createElement('li');
+    estadoContactos.textContent = 'Cargando contactos...';
+    listaContactos.appendChild(estadoContactos);
+    try {
+        const contactos = await window.coalertaData.getCommunityMemberEmergencyContacts(
+            miembro.id || miembro.uid
+        );
+        if (solicitudActual !== solicitudPerfilVecino) return;
+        listaContactos.replaceChildren();
+        if (!contactos.length) {
+            const vacio = document.createElement('li');
+            vacio.textContent = 'No hay contactos de emergencia registrados.';
+            listaContactos.appendChild(vacio);
+            return;
+        }
+        contactos.forEach((contacto) => {
+            const nombreContacto = String(contacto.nombre || '').trim();
+            const telefonoContacto = String(contacto.telefono || '').trim();
+            if (!nombreContacto || !/^9\d{8}$/.test(telefonoContacto)) return;
+            const item = document.createElement('li');
+            const enlace = document.createElement('a');
+            enlace.href = `tel:${telefonoContacto}`;
+            enlace.textContent = `${nombreContacto}: ${telefonoContacto}`;
+            item.appendChild(enlace);
+            listaContactos.appendChild(item);
+        });
+        if (!listaContactos.childElementCount) {
+            const vacio = document.createElement('li');
+            vacio.textContent = 'No hay contactos de emergencia registrados.';
+            listaContactos.appendChild(vacio);
+        }
+    } catch (error) {
+        if (solicitudActual !== solicitudPerfilVecino) return;
+        console.error('No se pudieron cargar los contactos de emergencia:', error);
+        listaContactos.replaceChildren();
+        const errorContactos = document.createElement('li');
+        errorContactos.textContent = 'No se pudieron cargar los contactos de emergencia.';
+        listaContactos.appendChild(errorContactos);
+    }
 }
 
 async function copiarCodigo() {

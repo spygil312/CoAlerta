@@ -75,8 +75,8 @@ window.coalertaSonidoEmergencia = (function () {
     return {
         unlock,
         play,
-        isEnabled: () => preferenciasSonidoAlertas.alertas !== false &&
-            preferenciasSonidoAlertas.sonido !== false
+        isEnabled: () => preferenciasSonidoAlertas.sonido !== false,
+        areAlertNotificationsEnabled: () => preferenciasSonidoAlertas.alertas !== false
     };
 })();
 
@@ -169,6 +169,8 @@ document.addEventListener("DOMContentLoaded", function () {
         detectarAvisosNuevos();
         actualizarNotificaciones();
     });
+    window.addEventListener("coalerta:preferencias-cargadas", actualizarNotificaciones);
+    window.addEventListener("coalerta:preferencias-cambiadas", actualizarNotificaciones);
     window.addEventListener("coalerta:datos-listos", function () {
         actualizarNotificaciones();
         if (!menu.hidden && !ubicacionActual && !intentoUbicacionRealizado) {
@@ -269,7 +271,8 @@ document.addEventListener("DOMContentLoaded", function () {
             .map((alerta) => String(alerta.alertaId || alerta.id)));
         const avisosLeidos = new Set(window.coalertaData.getReadNotices()
             .map((aviso) => String(aviso.avisoId || aviso.id)));
-        const alertas = window.coalertaData.getAlerts()
+        const alertas = window.coalertaSonidoEmergencia.areAlertNotificationsEnabled()
+            ? window.coalertaData.getAlerts()
             .filter((alerta) => {
                 if (!alerta || typeof alerta !== "object") return false;
                 const latitud = Number(alerta.latitud);
@@ -287,7 +290,8 @@ document.addEventListener("DOMContentLoaded", function () {
                         ? alerta.comunidadId === perfil.comunidadId
                         : (alerta.visibilidad === "publica" || alerta.tipo === "alerta_abierta") && nearby);
             })
-            .map((alerta) => ({ ...alerta, notificationType: "alert" }));
+            .map((alerta) => ({ ...alerta, notificationType: "alert" }))
+            : [];
         const avisos = window.coalertaData.getNotices()
             .filter((aviso) => {
                 const id = String(aviso.id || "");
@@ -470,19 +474,19 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 
 function distanciaMetros(lat1, lon1, lat2, lon2) {
-    const radianes = (grados) => grados * Math.PI / 180;
-    const diferenciaLat = radianes(lat2 - lat1);
-    const diferenciaLon = radianes(lon2 - lon1);
-    const a = Math.sin(diferenciaLat / 2) ** 2 +
-        Math.cos(radianes(lat1)) * Math.cos(radianes(lat2)) *
-        Math.sin(diferenciaLon / 2) ** 2;
-    return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const [primeraLatitud, primeraLongitud, segundaLatitud, segundaLongitud] =
+        [lat1, lon1, lat2, lon2].map(Number);
+    if (![primeraLatitud, primeraLongitud, segundaLatitud, segundaLongitud]
+        .every(Number.isFinite)) return NaN;
+
+    return window.coalertaData.distanceMeters(
+        { latitud: primeraLatitud, longitud: primeraLongitud },
+        { latitud: segundaLatitud, longitud: segundaLongitud }
+    );
 }
 
 function formatearDistancia(metros) {
-    return metros < 1000
-        ? `${Math.round(metros)} m`
-        : `${(metros / 1000).toLocaleString("es", { maximumFractionDigits: 1 })} km`;
+    return window.coalertaFormatearDistancia(metros);
 }
 
 function obtenerTimestamp(alerta) {

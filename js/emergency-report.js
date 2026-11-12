@@ -122,12 +122,16 @@
                 );
             }
 
+            const direccion = typeof window.coalertaGeocodificarInverso === "function"
+                ? await window.coalertaGeocodificarInverso(latitude, longitude)
+                : "";
             const alertId = await submitEmergencyReport(
                 latitude,
                 longitude,
                 precisionMetros,
                 category,
                 detail,
+                direccion,
                 (attempt) => showStatus(
                     `Conexión inestable. Reintentando el envío de la emergencia (intento ${attempt + 1})…`,
                     "info"
@@ -138,7 +142,10 @@
             if (detailCounter) detailCounter.textContent = "0";
             if (detailInput) detailInput.disabled = false;
             countdown.hidden = true;
-            showStatus(`Emergencia registrada. Código: ${alertId}.`, "success");
+            showStatus(
+                `Emergencia registrada${direccion ? ` en ${direccion}` : ""}. Código: ${alertId}.`,
+                "success"
+            );
         } catch (error) {
             console.error("No se pudo enviar la emergencia:", error);
             if (detailInput) detailInput.disabled = false;
@@ -159,7 +166,7 @@
         status.hidden = false;
     }
 
-    async function submitEmergencyReport(lat, lng, precisionMetros, categoria, detalle, onRetry) {
+    async function submitEmergencyReport(lat, lng, precisionMetros, categoria, detalle, direccion, onRetry) {
         let signInAnonymously;
         let collection;
         let doc;
@@ -195,7 +202,7 @@
         const alert = {
             tipo: "alerta_abierta",
             comunidadId: null,
-            ubicacion: { lat, lng },
+            ubicacion: { lat, lng, ...(direccion ? { direccion } : {}) },
             categoria,
             precisionMetros,
             detalle,
@@ -330,7 +337,7 @@
     }
 
     function esEntornoLocal() {
-        return ["localhost", "127.0.0.1"].includes(window.location.hostname);
+        return window.coalertaEsEntornoLocal();
     }
 
     function getUserMessage(error) {

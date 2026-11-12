@@ -36,7 +36,7 @@
     <link rel="stylesheet" href="../css/estilos.css?v=mobile-nav-fixed-20261102">
     <link rel="stylesheet" href="../css/responsive.css">
     <link rel="stylesheet" href="../css/mapa.css?v=ordered-panels-gps-dispatch-20261029">
-    <link rel="stylesheet" href="../css/comunidad.css?v=shared-core-20261106">
+    <link rel="stylesheet" href="../css/comunidad.css?v=community-location-action-20261112">
     <script src="../js/tema.js?v=20261029-theme-scroll"></script>
 </head>
 
@@ -151,6 +151,9 @@
                             onclick="abrirModal('modal-codigo')" hidden>
                             <i class="fa-solid fa-user-plus"></i> Invitar vecinos
                         </button>
+                        <button class="btn-secundario-pequeno" type="button" id="btnActualizarUbicacion">
+                            <i class="fa-solid fa-location-crosshairs" aria-hidden="true"></i> Actualizar ubicación
+                        </button>
                         <button id="btn-unirse-comunidad" type="button" class="btn-secundario-pequeno"
                             onclick="abrirModal('modal-unirse')" hidden>
                             <i class="fa-solid fa-right-to-bracket"></i> Unirme a una comunidad
@@ -186,14 +189,14 @@
                         <div class="est-icono icono-naranja-claro"><i class="fa-solid fa-map-location-dot"></i></div>
                         <div class="est-info">
                             <h3 id="contadorZonas">—</h3>
-                            <p>ZONAS CERCANAS</p>
+                            <p>MUNICIPALIDAD Y BOMBEROS</p>
                         </div>
                     </div>
                     <div class="estadistica-card card">
                         <div class="est-icono icono-esmeralda"><i class="fa-regular fa-face-smile"></i></div>
                         <div class="est-info">
                             <h3 id="contadorLugares">—</h3>
-                            <p>LUGARES IMPORTANTES</p>
+                            <p>CENTROS DE SALUD</p>
                         </div>
                     </div>
                 </div>
@@ -209,34 +212,6 @@
 
                             <div id="contenedor-vecinos" class="lista-items"></div>
                         </div>
-                        <div class="comunidad-lista-card card">
-                            <div class="card-header">
-                                <h3>Comisarías y Serenazgo cercanos</h3>
-                                <button class="btn-secundario-pequeno" type="button" id="btnActualizarUbicacion">
-                                    <i class="fa-solid fa-location-crosshairs" aria-hidden="true"></i> Actualizar
-                                    ubicación
-                                </button>
-                            </div>
-                            <div class="lista-items" id="listaServiciosCercanos" aria-live="polite">
-                                <p class="sin-datos">Buscando comisarías y serenazgo cercanos...</p>
-                            </div>
-                        </div>
-
-                        <div class="comunidad-lista-card card">
-                            <div class="card-header">
-                                <h3>Zonas y lugares importantes</h3>
-                                <a href="mapa.html" class="enlace-accion">Abrir mapa <i
-                                        class="fa-solid fa-arrow-right"></i></a>
-                            </div>
-                            <div class="lista-items" id="listaLugaresCercanos" aria-live="polite">
-                                <p class="sin-datos">Buscando parques, centros de salud, escuelas y zonas cercanas...
-                                </p>
-                            </div>
-                            <small class="atribucion-mapa">Datos de lugares © colaboradores de OpenStreetMap.</small>
-                        </div>
-                    </div>
-
-                    <div class="comunidad-col-der">
                         <div class="comunidad-lista-card card">
                             <div class="card-header">
                                 <h3>Anuncios de la comunidad</h3>
@@ -260,6 +235,36 @@
                                     <p class="sin-datos">No hay comunicados oficiales para tu comunidad.</p>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+
+                    <div class="comunidad-col-der">
+                        <div class="comunidad-lista-card card">
+                            <div class="card-header">
+                                <h3>Comisarías y Serenazgo cercanos</h3>
+                                <div class="comunidad-lista-acciones">
+                                    <button id="btn-ver-servicios-cercanos" type="button"
+                                        class="btn-ver-lista enlace-accion" hidden>Ver todos</button>
+                                </div>
+                            </div>
+                            <div class="lista-items" id="listaServiciosCercanos" aria-live="polite">
+                                <p class="sin-datos">Buscando comisarías y serenazgo cercanos...</p>
+                            </div>
+                        </div>
+
+                        <div class="comunidad-lista-card card">
+                            <div class="card-header">
+                                <h3>Zonas y lugares importantes</h3>
+                                <div class="comunidad-lista-acciones">
+                                    <button id="btn-ver-lugares-cercanos" type="button"
+                                        class="btn-ver-lista enlace-accion" hidden>Ver todos</button>
+                                </div>
+                            </div>
+                            <div class="lista-items" id="listaLugaresCercanos" aria-live="polite">
+                                <p class="sin-datos">Buscando parques, centros de salud, escuelas y zonas cercanas...
+                                </p>
+                            </div>
+                            <small class="atribucion-mapa">Datos de lugares © colaboradores de OpenStreetMap.</small>
                         </div>
                     </div>
                 </div>
@@ -287,7 +292,6 @@
                 </div>
             </div>
         </div>
-
 
         <div id="modal-codigo" class="modal-overlay">
             <div class="modal-content">
@@ -338,6 +342,10 @@
                     <span id="perfil-rol" class="badge badge-activo">Vecino</span>
                     <p id="perfil-fecha-ingreso" class="perfil-miembro-detalle"></p>
                     <a id="perfil-telefono" class="perfil-miembro-telefono" hidden></a>
+                    <section id="perfil-contactos-emergencia" class="perfil-contactos-emergencia" hidden>
+                        <h4>Contactos de emergencia</h4>
+                        <ul id="perfil-lista-contactos-emergencia"></ul>
+                    </section>
                 </div>
             </div>
         </div>
@@ -382,10 +390,10 @@
         </nav>
     </div>
     <script type="module" src="../js/estado-cuenta.js?v=modular-sdk-1"></script>
-    <script src="../js/ubicacion.js"></script>
-    <script src="../js/notificaciones.js?v=expire-notifications-20261110"></script>
-    <script type="module" src="../js/coalerta-data.js?v=community-announcement-delete-20261103"></script>
-    <script type="module" src="../js/comunidad.js?v=expire-notifications-20261110"></script>
+    <script src="../js/ubicacion.js?v=shared-distance-utils-20261111"></script>
+    <script src="../js/notificaciones.js?v=alerts-sound-independent-20261112"></script>
+    <script type="module" src="../js/coalerta-data.js?v=onsite-gps-sync-20261112-emergency-contacts-20261113"></script>
+    <script type="module" src="../js/comunidad.js?v=community-view-all-count-20261112-emergency-contacts-20261113"></script>
 </body>
 
 </html>

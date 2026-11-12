@@ -308,7 +308,9 @@ document.addEventListener("DOMContentLoaded", function () {
         meta.className = "central-alerta-meta";
         meta.textContent = `${formatDate(alert.timestamp)} · ${alert.id}`;
         const description = document.createElement("p");
-        const approximateAddress = typeof alert.direccionAproximada === "string" && alert.direccionAproximada.trim()
+        const approximateAddress = typeof alert.direccion === "string" && alert.direccion.trim()
+            ? alert.direccion.trim()
+            : typeof alert.direccionAproximada === "string" && alert.direccionAproximada.trim()
             ? alert.direccionAproximada.trim()
             : typeof alert.ubicacion === "string" && alert.ubicacion.trim()
                 ? alert.ubicacion.trim()

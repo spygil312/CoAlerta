@@ -12,6 +12,17 @@ let ubicacionActualMapa = null;
 let comunidadActualMapa = null;
 let solicitudUbicacionMapa = false;
 const precisionMaximaUbicacionAceptableMetros = 100000;
+const CLAVE_LUGARES_MAPA = "coalerta_lugares_mapa";
+const VIGENCIA_LUGARES_MAPA_MS = 30 * 60 * 1000;
+const TIPOS_LUGAR_MAPA = {
+    salud: { icono: "fa-kit-medical", color: "marcador-salud", etiqueta: "Centro de salud" },
+    comisaria: { icono: "fa-shield-halved", color: "marcador-comisaria", etiqueta: "Comisaría / policía" },
+    serenazgo: { icono: "fa-shield-halved", color: "marcador-comisaria", etiqueta: "Serenazgo / seguridad ciudadana" },
+    bomberos: { icono: "fa-fire-extinguisher", color: "marcador-lugar", etiqueta: "Estación de bomberos" },
+    municipalidad: { icono: "fa-landmark", color: "marcador-lugar", etiqueta: "Municipalidad" },
+    lugar: { icono: "fa-location-dot", color: "marcador-lugar", etiqueta: "Lugar importante" }
+};
+const TIPOS_LUGAR_PERMANENTES = ["salud", "comisaria", "serenazgo"];
 window.coalertaEstadoUbicacionMapa = "pending";
 window.coalertaUbicacionMapa = null;
 
@@ -33,14 +44,23 @@ document.addEventListener("DOMContentLoaded", function () {
     const longitudeValue = query.get("lng");
     const targetLatitude = latitudeValue === null ? NaN : Number(latitudeValue);
     const targetLongitude = longitudeValue === null ? NaN : Number(longitudeValue);
+    let lugarObjetivo = null;
     if (Number.isFinite(targetLatitude) && Number.isFinite(targetLongitude) &&
         targetLatitude >= -90 && targetLatitude <= 90 &&
         targetLongitude >= -180 && targetLongitude <= 180) {
         window.map.setView([targetLatitude, targetLongitude], 17);
+        // Enlaces desde "Mi comunidad": ?lat=..&lng=..&tipo=..&nombre=..
+        lugarObjetivo = {
+            latitud: targetLatitude,
+            longitud: targetLongitude,
+            tipo: query.get("tipo"),
+            nombre: (query.get("nombre") || "").slice(0, 120)
+        };
     }
     window.grupoMarcadoresAlertas = L.layerGroup().addTo(window.map);
     window.marcadoresAlertas = [];
     const grupoMarcadoresSerenazgo = L.layerGroup().addTo(window.map);
+    const grupoMarcadoresLugares = L.layerGroup().addTo(window.map);
 
     const tileLayer = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}", {
         maxZoom: 19,
@@ -56,6 +76,7 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     cargarAlertasGuardadas();
+    mostrarLugaresCercanosEnMapa(grupoMarcadoresLugares, lugarObjetivo);
     configurarFiltrosMapa();
     configurarPerfilSidebar();
     configurarCierreSesion({
@@ -235,6 +256,85 @@ function actualizarMarcadoresSerenazgo(miembros, capa) {
         popup.append(nombre, tipo);
         marcador.bindPopup(popup).addTo(capa);
     });
+}
+
+function leerLugaresGuardados() {
+    try {
+        const guardado = JSON.parse(sessionStorage.getItem(CLAVE_LUGARES_MAPA) || "null");
+        if (!guardado || !Array.isArray(guardado.lugares) ||
+            !Number.isFinite(guardado.timestamp) || guardado.timestamp > Date.now() ||
+            Date.now() - guardado.timestamp > VIGENCIA_LUGARES_MAPA_MS) {
+            return [];
+        }
+        return guardado.lugares
+            .map((lugar) => ({
+                nombre: String(lugar.nombre || "Lugar sin nombre registrado"),
+                tipo: lugar.tipo,
+                latitud: Number(lugar.latitud),
+                longitud: Number(lugar.longitud)
+            }))
+            .filter((lugar) =>
+                TIPOS_LUGAR_PERMANENTES.includes(lugar.tipo) &&
+                Number.isFinite(lugar.latitud) && lugar.latitud >= -90 && lugar.latitud <= 90 &&
+                Number.isFinite(lugar.longitud) && lugar.longitud >= -180 && lugar.longitud <= 180);
+    } catch (error) {
+        console.warn("No se pudieron leer los lugares cercanos guardados:", error);
+        return [];
+    }
+}
+
+function crearMarcadorLugar(lugar) {
+    const tipo = TIPOS_LUGAR_MAPA[lugar.tipo] || TIPOS_LUGAR_MAPA.lugar;
+    const marcador = L.marker([lugar.latitud, lugar.longitud], {
+        icon: crearIconoMapa(tipo.icono, tipo.color),
+        zIndexOffset: -100,
+        title: lugar.nombre
+    });
+    const popup = document.createElement("div");
+    popup.className = "popup-coalerta";
+    const nombre = document.createElement("strong");
+    nombre.textContent = lugar.nombre;
+    const detalle = document.createElement("div");
+    detalle.textContent = tipo.etiqueta;
+    popup.append(nombre, detalle);
+    marcador.bindPopup(popup);
+    return marcador;
+}
+
+// Dibuja los centros de salud y comisarías encontrados en "Mi comunidad" y,
+// si se llegó desde un enlace de esa página, abre el lugar seleccionado.
+function mostrarLugaresCercanosEnMapa(capa, lugarObjetivo) {
+    if (!capa) return;
+    capa.clearLayers();
+    const margen = 0.0002; // ≈ 22 m
+    let elegido = null;
+    let menorDistancia = Infinity;
+
+    leerLugaresGuardados().forEach((lugar) => {
+        const marcador = crearMarcadorLugar(lugar).addTo(capa);
+        if (!lugarObjetivo) return;
+        const dLat = Math.abs(lugar.latitud - lugarObjetivo.latitud);
+        const dLng = Math.abs(lugar.longitud - lugarObjetivo.longitud);
+        if (dLat > margen || dLng > margen) return;
+        // El nombre coincidente tiene prioridad; si no, el más cercano.
+        const distancia = dLat + dLng - (lugar.nombre === lugarObjetivo.nombre ? 1 : 0);
+        if (distancia < menorDistancia) {
+            menorDistancia = distancia;
+            elegido = marcador;
+        }
+    });
+
+    // Lugar seleccionado que no se guarda de forma permanente (bomberos, municipalidad)
+    // o cuya lista ya venció: se muestra solo ese marcador.
+    if (!elegido && lugarObjetivo && lugarObjetivo.tipo) {
+        elegido = crearMarcadorLugar({
+            nombre: lugarObjetivo.nombre || "Lugar seleccionado",
+            tipo: TIPOS_LUGAR_MAPA[lugarObjetivo.tipo] ? lugarObjetivo.tipo : "lugar",
+            latitud: lugarObjetivo.latitud,
+            longitud: lugarObjetivo.longitud
+        }).addTo(capa);
+    }
+    if (elegido) elegido.openPopup();
 }
 
 function configurarPanelAlertasMovil() {

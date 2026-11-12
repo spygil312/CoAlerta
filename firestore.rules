@@ -159,14 +159,6 @@ service cloud.firestore {
         && profile(request.auth.uid).activo == true;
     }
 
-    function staff() {
-      return activeUser()
-        && (
-          profile(request.auth.uid).rol in ['coordinador', 'agente', 'seguridad', 'administrador', 'admin']
-          || activeDelegation()
-        );
-    }
-
     function staffForCommunity(comunidadId) {
       return adminOperator()
         || (comunidadId is string
@@ -538,7 +530,7 @@ service cloud.firestore {
           && getAfter(closePatrolPath).data.estado == 'En sitio'
           && getAfter(closePatrolPath).data.incidenteId == incidentId
           && getAfter(closePatrolPath).data.precisionMetros is number
-          && getAfter(closePatrolPath).data.precisionMetros < 15
+          && getAfter(closePatrolPath).data.precisionMetros <= 50000
           && getAfter(closePatrolPath).data.latitud is number
           && getAfter(closePatrolPath).data.latitud > resource.data.latitud - 0.00014
           && getAfter(closePatrolPath).data.latitud < resource.data.latitud + 0.00014
@@ -725,6 +717,27 @@ service cloud.firestore {
         );
     }
 
+    function validEmergencyContacts(contacts) {
+      return contacts is list
+        && contacts.size() <= 2
+        && (contacts.size() < 1
+          || contacts[0] is map
+          && contacts[0].keys().hasOnly(['nombre', 'telefono'])
+          && contacts[0].nombre is string
+          && contacts[0].nombre.size() > 0
+          && contacts[0].nombre.size() <= 80
+          && contacts[0].telefono is string
+          && contacts[0].telefono.matches('^9[0-9]{8}$'))
+        && (contacts.size() < 2
+          || contacts[1] is map
+          && contacts[1].keys().hasOnly(['nombre', 'telefono'])
+          && contacts[1].nombre is string
+          && contacts[1].nombre.size() > 0
+          && contacts[1].nombre.size() <= 80
+          && contacts[1].telefono is string
+          && contacts[1].telefono.matches('^9[0-9]{8}$'));
+    }
+
     function validProfileUpdate(uid) {
       let data = request.resource.data;
       let contacts = data.get('contactosEmergencia', []);
@@ -775,24 +788,26 @@ service cloud.firestore {
           && (!('ubicacion' in preferences) || preferences.ubicacion is bool)
           && (!('temaOscuro' in preferences) || preferences.temaOscuro is bool))
         && (!('contactosEmergencia' in data)
-          || contacts is list
-          && contacts.size() <= 2
-          && (contacts.size() < 1
-            || contacts[0] is map
-            && contacts[0].keys().hasOnly(['nombre', 'telefono'])
-            && contacts[0].nombre is string
-            && contacts[0].nombre.size() > 0
-            && contacts[0].nombre.size() <= 80
-            && contacts[0].telefono is string
-            && contacts[0].telefono.matches('^9[0-9]{8}$'))
-          && (contacts.size() < 2
-            || contacts[1] is map
-            && contacts[1].keys().hasOnly(['nombre', 'telefono'])
-            && contacts[1].nombre is string
-            && contacts[1].nombre.size() > 0
-            && contacts[1].nombre.size() <= 80
-            && contacts[1].telefono is string
-            && contacts[1].telefono.matches('^9[0-9]{8}$')));
+          || validEmergencyContacts(contacts));
+    }
+
+    function validCommunityEmergencyContactsWrite(comunidadId, uid) {
+      let data = request.resource.data;
+      let profilePath = /databases/$(database)/documents/usuarios/$(uid);
+      return self(uid)
+        && activeUser()
+        && profile(uid).comunidadId == comunidadId
+        && data.keys().hasOnly(['contactos'])
+        && data.keys().hasAll(['contactos'])
+        && validEmergencyContacts(data.contactos)
+        && data.contactos == getAfter(profilePath).data.get('contactosEmergencia', []);
+    }
+
+    function canReadCommunityEmergencyContacts(comunidadId) {
+      return activeUser()
+        && profile(request.auth.uid).comunidadId == comunidadId
+        && (profile(request.auth.uid).rol in ['coordinador', 'seguridad']
+          || activeDelegation());
     }
 
     function validOutgoingContactMessage() {
@@ -1084,8 +1099,10 @@ service cloud.firestore {
     function validPatrolUpdate(patrolId) {
       let changed = request.resource.data.diff(resource.data).affectedKeys();
       let data = request.resource.data;
-      let incidentId = data.get('incidenteId', '');
-      let incidentPath = /databases/$(database)/documents/incidentes/$(incidentId is string ? incidentId : 'no-incident');
+      let incidentId = data.get('incidenteId', null) == null
+        ? resource.data.get('incidenteId', '')
+        : data.get('incidenteId', '');
+      let incidentPath = /databases/$(database)/documents/incidentes/$(incidentId is string && incidentId.size() > 0 ? incidentId : 'no-incident');
       let incident = getAfter(incidentPath).data;
       let locationAndStatusUpdate = validPatrolLocation(patrolId)
         && changed.hasOnly([
@@ -1109,7 +1126,12 @@ service cloud.firestore {
           && incident.comunidadId == resource.data.comunidadId
           && data.comunidadId == incident.comunidadId
           && (
-            data.estado == 'Despachado'
+            data.estado == 'Disponible'
+            && incident.estado == 'Descartada'
+            && resource.data.estado in ['Despachado', 'En sitio']
+            && resource.data.incidenteId == incidentId
+            && data.get('incidenteId', null) == null
+            || data.estado == 'Despachado'
             && incident.estado == 'Auxilio en camino'
             && resource.data.estado == 'Disponible'
             && resource.data.get('incidenteId', null) == null
@@ -1173,7 +1195,19 @@ service cloud.firestore {
             .hasOnly(['estado', 'incidenteId', 'updatedAt'])
           && request.resource.data.updatedAt == request.time
         );
-      return statusUpdate;
+      let coordinatorDiscardRelease = coordinatorFor(resource.data.comunidadId)
+        && existsAfter(incidentPath)
+        && incident.patrullaId == patrolId
+        && incident.comunidadId == resource.data.comunidadId
+        && incident.estado == 'Descartada'
+        && resource.data.estado in ['Despachado', 'En sitio']
+        && resource.data.incidenteId == incidentId
+        && request.resource.data.estado == 'Disponible'
+        && request.resource.data.get('incidenteId', null) == null
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['estado', 'incidenteId', 'updatedAt'])
+        && request.resource.data.updatedAt == request.time;
+      return statusUpdate || coordinatorDiscardRelease;
     }
 
     function validCommunityAnnouncementCreate(comunidadId) {
@@ -1313,6 +1347,7 @@ service cloud.firestore {
           'codigoCategoria',
           'consentimientoGPS',
           'detalle',
+          'direccion',
           'latitud',
           'longitud',
           'precisionMetros',
@@ -1346,6 +1381,8 @@ service cloud.firestore {
         )
         && data.detalle is string
         && data.detalle.size() <= 300
+        && (!('direccion' in data)
+          || data.direccion is string && data.direccion.size() <= 200)
         && data.latitud is number
         && data.latitud >= -90
         && data.latitud <= 90
@@ -1612,13 +1649,15 @@ service cloud.firestore {
         && data.comunidadId == null
         && data.ubicacion is map
         && data.ubicacion.keys().hasAll(['lat', 'lng'])
-        && data.ubicacion.keys().hasOnly(['lat', 'lng'])
+        && data.ubicacion.keys().hasOnly(['lat', 'lng', 'direccion'])
         && data.ubicacion.lat is number
         && data.ubicacion.lat >= -90
         && data.ubicacion.lat <= 90
         && data.ubicacion.lng is number
         && data.ubicacion.lng >= -180
         && data.ubicacion.lng <= 180
+        && (!('direccion' in data.ubicacion)
+          || data.ubicacion.direccion is string && data.ubicacion.direccion.size() <= 200)
         && data.creadorId is string
         && (!('consentimientoGPS' in data) || data.consentimientoGPS == true)
         && (!('detalle' in data) || data.detalle is string && data.detalle.size() <= 300)
@@ -1670,7 +1709,7 @@ service cloud.firestore {
         && data.estado == 'pendiente';
     }
 
-    function validOpenEmergencyCreate(alertId) {
+    function validOpenEmergencyCreate() {
       let data = request.resource.data;
       let throttle = getAfter(
         /databases/$(database)/documents/limites_alertas_abiertas/$(request.auth.uid)
@@ -1915,7 +1954,7 @@ service cloud.firestore {
           && profile(request.auth.uid).rol in ['seguridad', 'agente', 'administrador', 'admin'];
       allow list: if activeUser()
         && profile(request.auth.uid).rol in ['seguridad', 'agente', 'administrador', 'admin'];
-      allow create: if validOpenEmergencyCreate(alertaId);
+      allow create: if validOpenEmergencyCreate();
       allow update: if validOpenEmergencyAssignment();
       allow delete: if false;
     }
@@ -2020,6 +2059,13 @@ service cloud.firestore {
         allow create: if validMemberJoin(comunidadId, uid);
         allow update: if validCommunityMemberLocationUpdate(comunidadId, uid)
           || validCommunityMemberProfileUpdate(comunidadId, uid);
+        allow delete: if false;
+      }
+
+      match /contactos_emergencia/{uid} {
+        allow get: if canReadCommunityEmergencyContacts(comunidadId);
+        allow list: if false;
+        allow create, update: if validCommunityEmergencyContactsWrite(comunidadId, uid);
         allow delete: if false;
       }
 

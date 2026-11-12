@@ -153,7 +153,7 @@ document.addEventListener("DOMContentLoaded", function () {
             ? "Solicitud pendiente de aprobación. Hasta entonces, tus permisos siguen siendo de vecino."
             : usuario.estadoSolicitudRol === "rechazada"
                 ? "Tu solicitud de cambio de rol fue rechazada. Conservas los permisos de vecino."
-                : "Usuario registrado en CoAlerta";
+                : "";
 
         establecerValor("nombres", nombres);
         establecerValor("apellidos", apellidos);

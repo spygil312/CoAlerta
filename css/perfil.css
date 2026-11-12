@@ -24,24 +24,38 @@
 
 .perfil-grid {
     display: grid;
-    grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
-    gap: 18px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
 }
 
 .perfil-resumen-card {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 100px minmax(0, 1fr) max-content;
+    grid-template-areas:
+        "avatar . ."
+        "avatar nombre rol"
+        "avatar info info"
+        "avatar estado estado"
+        "avatar . .";
+    grid-template-rows: minmax(0, 1fr) auto auto auto minmax(0, 1fr);
+    align-items: center;
+    column-gap: 16px;
+    row-gap: 2px;
     align-self: start;
-    padding: 25px;
-    text-align: center;
+    padding: 20px;
+    text-align: left;
     border-radius: 18px;
     background: var(--blanco);
     border: 1px solid var(--borde);
 }
 
 .perfil-avatar-grande {
+    grid-area: avatar;
     position: relative;
     width: 100px;
     height: 100px;
-    margin: 0 auto;
+    margin: 0;
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -101,15 +115,18 @@
 }
 
 .perfil-resumen-card h2 {
-    margin-top: 15px;
+    grid-area: nombre;
+    margin: 0;
     font-size: 19px;
 }
 
 .perfil-rol {
+    grid-area: rol;
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    margin-top: 8px;
+    justify-self: start;
+    margin-top: 0;
     padding: 6px 9px;
     border-radius: 999px;
     background: var(--verde-claro);
@@ -119,16 +136,22 @@
 }
 
 .perfil-resumen-card > p {
-    margin-top: 10px;
+    grid-area: estado;
+    margin-top: 0;
     color: var(--texto-secundario);
     font-size: 12px;
 }
 
+.perfil-resumen-card > p:empty {
+    display: none;
+}
+
 .perfil-resumen-info {
-    margin-top: 22px;
-    display: grid;
-    gap: 11px;
-    text-align: left;
+    grid-area: info;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    margin-top: 0;
 }
 
 .perfil-resumen-info div {
@@ -145,23 +168,31 @@
     color: var(--verde-principal);
 }
 
-.perfil-verificado {
-    margin-top: 20px;
-    padding: 9px;
-    border-radius: 10px;
-    background: var(--verde-claro);
-    color: var(--verde-oscuro);
-    font-size: 11px;
-    font-weight: 700;
-}
-
 .perfil-paneles {
     display: grid;
-    gap: 18px;
+    grid-column: 1 / -1;
+    grid-template-columns: minmax(0, 1.8fr) minmax(260px, 0.9fr);
+    grid-template-areas:
+        "informacion preferencias"
+        "contactos seguridad"
+        "desactivacion privacidad";
+    align-items: stretch;
+    gap: 14px;
+}
+
+.perfil-paneles > .perfil-card:nth-child(1) { grid-area: informacion; }
+.perfil-paneles > .perfil-card:nth-child(2) { grid-area: seguridad; }
+.perfil-paneles > .perfil-card:nth-child(3) { grid-area: contactos; }
+.perfil-paneles > .perfil-card:nth-child(4) { grid-area: desactivacion; }
+.perfil-paneles > .perfil-card:nth-child(5) { grid-area: preferencias; }
+.perfil-paneles > .perfil-card:nth-child(6) { grid-area: privacidad; }
+
+.perfil-paneles > .perfil-card:nth-child(5) {
+    align-self: start;
 }
 
 .perfil-card {
-    padding: 20px;
+    padding: 16px;
     border-radius: 17px;
     background: var(--blanco);
     border: 1px solid var(--borde);
@@ -183,8 +214,8 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 15px;
-    margin-bottom: 20px;
+    gap: 12px;
+    margin-bottom: 14px;
 }
 
 .perfil-card-header h2 {
@@ -209,13 +240,14 @@
 
 .perfil-formulario {
     display: grid;
-    gap: 15px;
+    gap: 12px;
 }
 
 .perfil-form-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 14px;
+    align-items: start;
+    gap: 10px;
 }
 
 .campo-ayuda {
@@ -304,8 +336,8 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 20px;
-    padding: 15px 0;
+    gap: 14px;
+    padding: 11px 0;
     border-bottom: 1px solid var(--borde);
 }
 
@@ -545,9 +577,28 @@
     }
 
     .perfil-resumen-card {
+        grid-template-columns: 72px minmax(0, 1fr) max-content;
+        column-gap: 14px;
         max-width: 520px;
         width: 100%;
         margin: 0 auto;
+    }
+
+    .perfil-avatar-grande {
+        width: 72px;
+        height: 72px;
+        font-size: 30px;
+    }
+
+    .perfil-paneles {
+        grid-template-columns: 1fr;
+        grid-template-areas:
+            "informacion"
+            "preferencias"
+            "seguridad"
+            "contactos"
+            "desactivacion"
+            "privacidad";
     }
 
     .perfil-resumen-card h2 {

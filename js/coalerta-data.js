@@ -1,6 +1,7 @@
 import {
     collection, deleteDoc, doc, getDoc, getDocs, getDocsFromServer, limit, onSnapshot,
-    orderBy, query, runTransaction, serverTimestamp, setDoc, Timestamp, updateDoc, where
+    orderBy, query, runTransaction, serverTimestamp, setDoc, Timestamp, updateDoc, where,
+    writeBatch
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
@@ -209,8 +210,16 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
     }
 
     function watch(query, property, eventName, area) {
-        const unsubscribe = onSnapshot(query, (snapshot) => {
-            state[property] = snapshot.docs.map(normalizeDocument);
+        const unsubscribe = onSnapshot(query, {
+            includeMetadataChanges: property === "patrols"
+        }, (snapshot) => {
+            state[property] = snapshot.docs.map((document) => {
+                const normalized = normalizeDocument(document);
+                if (property === "patrols") {
+                    normalized._hasPendingWrites = document.metadata.hasPendingWrites;
+                }
+                return normalized;
+            });
             dispatch(eventName, state[property]);
         }, (error) => reportListenerError(area, error));
         state.listeners.push(unsubscribe);
@@ -797,6 +806,7 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
                     etaMinutos: incident.etaMinutos || null,
                     latitud: incident.latitud,
                     longitud: incident.longitud,
+                    direccion: incident.direccion || alert.direccion || null,
                     motivoDescarte: incident.motivoDescarte || null,
                     resultado: incident.resultado || null,
                     derivadaAt: incident.derivadaAt || null,
@@ -884,6 +894,7 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
         if (!Number.isFinite(precisionMetros) || precisionMetros <= 0 || precisionMetros >= 5) {
             throw new Error("La precisión GPS debe ser menor a 5 metros.");
         }
+        const direccion = await obtenerDireccionInversa(latitud, longitud);
 
         const coordinatorNeedsCommunity = effectiveRole() === "coordinador" && !state.profile.comunidadId;
         const communityId = effectiveRole() === "coordinador"
@@ -1037,6 +1048,7 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
                 detalle,
                 latitud,
                 longitud,
+                ...(direccion ? { direccion } : {}),
                 precisionMetros,
                 prioridad,
                 estado: "Recibido en servidor",
@@ -1085,7 +1097,15 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
             return { incidentId: newIncidentRef.id, agrupada: false, reportes: 1 };
         });
 
-        return result;
+        return { ...result, direccion };
+    }
+
+    async function obtenerDireccionInversa(latitud, longitud) {
+        if (typeof window.coalertaGeocodificarInverso !== "function") {
+            console.warn("No está disponible el servicio de geocodificación inversa.");
+            return "";
+        }
+        return window.coalertaGeocodificarInverso(latitud, longitud);
     }
 
     async function transitionIncident(incidentId, action, payload = {}) {
@@ -1112,7 +1132,7 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
 
         let patrolRef = null;
         let patrolSnapshot = null;
-        if (["dispatch", "onsite", "close"].includes(action)) {
+        if (["dispatch", "onsite", "close", "discard"].includes(action)) {
             let patrolId;
             if (action === "dispatch") {
                 patrolId = String(payload.patrullaId || profile.patrullaId || "").trim();
@@ -1121,11 +1141,14 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
                 if (!incidentForPatrol.exists()) throw new Error("No se encontró el incidente.");
                 patrolId = String(incidentForPatrol.get("patrullaId") || "").trim();
             }
-            if (!patrolId || patrolId.length > 80) {
+            if (!patrolId && action === "discard") {
+                patrolRef = null;
+            } else if (!patrolId || patrolId.length > 80) {
                 throw new Error("El incidente no tiene un identificador de patrulla válido.");
+            } else {
+                patrolRef = doc(db, "patrullas", patrolId);
+                patrolSnapshot = await getDoc(patrolRef);
             }
-            patrolRef = doc(db, "patrullas", patrolId);
-            patrolSnapshot = await getDoc(patrolRef);
         }
 
         const result = await runTransaction(db, async (transaction) => {
@@ -1236,12 +1259,17 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
                 }
                 const patrol = patrolSnapshot.data();
                 const updatedAt = patrol.updatedAt;
-                if (!updatedAt || typeof updatedAt.toMillis !== "function" ||
-                    Date.now() - updatedAt.toMillis() > 2 * 60 * 1000 ||
+                const updatedAtMillis = updatedAt && typeof updatedAt.toMillis === "function"
+                    ? updatedAt.toMillis()
+                    : NaN;
+                const updatedAtAge = Date.now() - updatedAtMillis;
+                if (!Number.isFinite(updatedAtMillis) ||
+                    updatedAtAge < -10000 || updatedAtAge > 2 * 60 * 1000 ||
                     !Number.isFinite(Number(patrol.precisionMetros)) ||
-                    Number(patrol.precisionMetros) >= 15 ||
-                    distanceMeters(current, patrol) >= 15) {
-                    throw new Error("La ubicación GPS debe ser reciente, tener precisión menor a 15 m y estar a menos de 15 m del incidente.");
+                    Number(patrol.precisionMetros) <= 0 ||
+                    Number(patrol.precisionMetros) > 50000 ||
+                    distanceMeters(current, patrol) > 15) {
+                    throw new Error("La ubicación GPS debe ser reciente y estar a 15 m o menos del incidente.");
                 }
                 changes = { estado: "Agentes en sitio", enSitioAt: serverTimestamp() };
             } else if (action === "close" && current.estado === "Agentes en sitio") {
@@ -1284,7 +1312,13 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
                 changes
             );
             transaction.set(publicRef, makePublicAlert(updated), { merge: true });
-            if (patrolRef && patrolSnapshot) {
+            const shouldReleaseDiscardedPatrol = action === "discard" &&
+                patrolRef && patrolSnapshot && patrolSnapshot.exists() &&
+                patrolSnapshot.get("incidenteId") === id &&
+                ["Despachado", "En sitio"].includes(patrolSnapshot.get("estado"));
+            if (patrolRef && patrolSnapshot && (
+                ["dispatch", "onsite", "close"].includes(action) || shouldReleaseDiscardedPatrol
+            )) {
                 const patrolChanges = action === "dispatch"
                     ? { estado: "Despachado", incidenteId: id, updatedAt }
                     : action === "onsite"
@@ -1421,6 +1455,43 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
         const location = validatePoint(point);
         const patrolRef = doc(db, "patrullas", patrolId);
         const profileRef = doc(db, "usuarios", user.uid);
+        const patrolSnapshot = await getDoc(patrolRef);
+        if (patrolSnapshot.exists()) {
+            const previousIncidentId = patrolSnapshot.get("incidenteId");
+            let releaseDiscardedIncident = false;
+            if (["Despachado", "En sitio"].includes(patrolSnapshot.get("estado")) &&
+                typeof previousIncidentId === "string" && previousIncidentId) {
+                const previousIncidentSnapshot = await getDoc(doc(db, "incidentes", previousIncidentId));
+                releaseDiscardedIncident = previousIncidentSnapshot.exists() &&
+                    previousIncidentSnapshot.get("estado") === "Descartada" &&
+                    previousIncidentSnapshot.get("patrullaId") === patrolId;
+            }
+            const locationTimestamp = serverTimestamp();
+            const batch = writeBatch(db);
+            const patrolUpdate = {
+                comunidadId,
+                agenteUid: user.uid,
+                latitud: location.latitud,
+                longitud: location.longitud,
+                precisionMetros: location.precisionMetros,
+                updatedAt: locationTimestamp
+            };
+            if (releaseDiscardedIncident) {
+                patrolUpdate.estado = "Disponible";
+                patrolUpdate.incidenteId = null;
+            }
+            batch.update(patrolRef, patrolUpdate);
+            batch.update(profileRef, {
+                ultimaUbicacion: {
+                    latitud: location.latitud,
+                    longitud: location.longitud,
+                    timestamp: locationTimestamp
+                }
+            });
+            await batch.commit();
+            return { ok: true, patrullaId: patrolId };
+        }
+
         await runTransaction(db, async (transaction) => {
             const snapshot = await transaction.get(patrolRef);
             const locationTimestamp = serverTimestamp();
@@ -1524,8 +1595,36 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
         if (!nombre || !/^9\d{8}$/.test(telefono)) {
             throw new Error("El nombre o teléfono del perfil no es válido para actualizar el contacto comunitario.");
         }
-        if (memberSnapshot.get("nombre") === nombre && memberSnapshot.get("telefono") === telefono) return;
-        await updateDoc(memberRef, { nombre, telefono });
+        if (memberSnapshot.get("nombre") !== nombre || memberSnapshot.get("telefono") !== telefono) {
+            await updateDoc(memberRef, { nombre, telefono });
+        }
+        if (Array.isArray(profile.contactosEmergencia)) {
+            await synchronizeCommunityEmergencyContacts(uid, communityId, profile.contactosEmergencia);
+        }
+    }
+
+    function normalizeEmergencyContacts(contacts) {
+        if (!Array.isArray(contacts) || contacts.length > 2) {
+            throw new TypeError("Puedes guardar hasta dos contactos.");
+        }
+        const sanitized = contacts.map((contact) => ({
+            nombre: String(contact && contact.nombre || "").trim(),
+            telefono: String(contact && contact.telefono || "").trim()
+        }));
+        if (sanitized.some((contact) => !contact.nombre || contact.nombre.length > 80 ||
+            !/^9\d{8}$/.test(contact.telefono))) {
+            throw new TypeError("Cada contacto debe tener un nombre y un celular válido que empiece con 9 y tenga 9 dígitos.");
+        }
+        return sanitized;
+    }
+
+    async function synchronizeCommunityEmergencyContacts(uid, communityId, contacts) {
+        const sanitized = normalizeEmergencyContacts(contacts);
+        const contactsRef = doc(db, "comunidades", communityId, "contactos_emergencia", uid);
+        const snapshot = await getDoc(contactsRef);
+        const currentContacts = snapshot.exists() ? snapshot.get("contactos") : null;
+        if (JSON.stringify(currentContacts) === JSON.stringify(sanitized)) return;
+        await setDoc(contactsRef, { contactos: sanitized });
     }
 
     async function synchronizeCurrentCommunityMemberProfile(profileUpdates) {
@@ -1803,22 +1902,18 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
     }
 
     async function saveEmergencyContacts(contacts) {
-        const { user } = requireActiveProfile();
-        if (!Array.isArray(contacts) || contacts.length > 2) {
-            throw new TypeError("Puedes guardar hasta dos contactos.");
-        }
-        const sanitized = contacts.map((contact) => ({
-            nombre: String(contact && contact.nombre || "").trim(),
-            telefono: String(contact && contact.telefono || "").trim()
-        }));
-        if (sanitized.some((contact) => !contact.nombre || contact.nombre.length > 80 ||
-            !/^9\d{8}$/.test(contact.telefono))) {
-            throw new TypeError("Cada contacto debe tener un nombre y un celular válido que empiece con 9 y tenga 9 dígitos.");
-        }
+        const { user, profile } = requireActiveProfile();
+        const sanitized = normalizeEmergencyContacts(contacts);
         const profileRef = doc(db, "usuarios", user.uid);
         const outgoingMessageRefs = sanitized.map(() => doc(collection(db, "mensajes_salientes")));
         await runTransaction(db, async (transaction) => {
             transaction.set(profileRef, { contactosEmergencia: sanitized }, { merge: true });
+            if (profile.comunidadId) {
+                transaction.set(
+                    doc(db, "comunidades", profile.comunidadId, "contactos_emergencia", user.uid),
+                    { contactos: sanitized }
+                );
+            }
             sanitized.forEach((contact, index) => {
                 transaction.set(outgoingMessageRefs[index], {
                     ...contact,
@@ -1830,6 +1925,22 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
             });
         });
         return { ok: true, notificationSent: false, notificationQueued: sanitized.length };
+    }
+
+    async function getCommunityMemberEmergencyContacts(uid) {
+        const { profile } = requireRole(["coordinador", "seguridad"]);
+        const memberUid = String(uid || "").trim();
+        if (!profile.comunidadId || !memberUid) {
+            throw new TypeError("No se pudo identificar al miembro de la comunidad.");
+        }
+        const contactsRef = doc(db, "comunidades", profile.comunidadId, "contactos_emergencia", memberUid);
+        const snapshot = await getDoc(contactsRef);
+        if (!snapshot.exists()) return [];
+        const contacts = snapshot.get("contactos");
+        if (!Array.isArray(contacts)) {
+            throw new Error("El formato de los contactos de emergencia del miembro no es válido.");
+        }
+        return contacts;
     }
 
     async function deactivateAccount(dni) {
@@ -1893,6 +2004,7 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
         deleteCommunityAnnouncement,
         listCommunityDelegates,
         saveEmergencyContacts,
+        getCommunityMemberEmergencyContacts,
         deactivateAccount
     };
 

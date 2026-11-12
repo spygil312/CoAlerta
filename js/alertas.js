@@ -246,6 +246,7 @@ document.addEventListener("DOMContentLoaded", function () {
             const submitted = await window.coalertaData.createAlert(payload);
             const submittedAlert = {
                 ...payload,
+                direccion: submitted.direccion || "",
                 id: submitted.incidentId,
                 estado: "Recibido en servidor",
                 prioridad: normalizedCategory === "sospecha" ? "Media" : "Alta",
@@ -419,7 +420,7 @@ document.addEventListener("DOMContentLoaded", function () {
         elapsed.textContent = elapsedTime(alert.timestamp);
         top.append(title, elapsed);
         const location = document.createElement("p");
-        location.textContent = alert.ubicacion || "Ubicación aproximada del incidente";
+        location.textContent = alert.direccion || alert.ubicacion || "Ubicación aproximada del incidente";
         const footer = document.createElement("div");
         footer.className = "alerta-item-footer";
         const state = document.createElement("span");
@@ -781,7 +782,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function esEntornoLocal() {
-        return ["localhost", "127.0.0.1"].includes(window.location.hostname);
+        return window.coalertaEsEntornoLocal();
     }
 
     function showFeedback(message, type, iconClass = "") {

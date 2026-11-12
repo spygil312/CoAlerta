@@ -288,9 +288,14 @@ body.pagina-comunidad {
 
 .comunidad-acciones {
     display: flex;
+    align-items: center;
     flex-wrap: wrap;
     gap: 10px;
     margin-top: 14px;
+}
+
+.comunidad-acciones .btn-secundario-pequeno {
+    white-space: nowrap;
 }
 
 .comunidad-acciones button[hidden],
@@ -425,13 +430,30 @@ body.pagina-comunidad {
 .comunidad-main-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+        "miembros servicios"
+        "anuncios lugares";
     gap: 20px;
 }
 
 .comunidad-col-izq, .comunidad-col-der {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
+    display: contents;
+}
+
+.comunidad-col-izq > .comunidad-lista-card:first-child {
+    grid-area: miembros;
+}
+
+.comunidad-col-izq > .comunidad-lista-card:nth-child(2) {
+    grid-area: anuncios;
+}
+
+.comunidad-col-der > .comunidad-lista-card:first-child {
+    grid-area: servicios;
+}
+
+.comunidad-col-der > .comunidad-lista-card:nth-child(2) {
+    grid-area: lugares;
 }
 
 .comunidad-lista-card {
@@ -743,18 +765,36 @@ body.pagina-comunidad {
 }
 
 .modal-content-lista {
-    width: min(92vw, 600px);
-    max-width: 600px;
+    width: min(92vw, 680px);
+    max-width: 680px;
     max-height: 88vh;
+    max-height: 88dvh;
     display: flex;
     flex-direction: column;
 }
 
 .modal-lista-contenido {
     min-height: 0;
+    max-height: 70vh;
+    max-height: 70dvh;
     overflow-y: auto;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
+}
+
+.comunidad-lista-acciones {
+    min-width: 0;
+}
+
+.comunidad-lista-card .item-autoridad,
+.comunidad-lista-card .item-lugar {
+    min-width: 0;
+}
+
+.comunidad-lista-card .autoridad-info,
+.comunidad-lista-card .lugar-info {
+    flex: 1 1 140px;
+    overflow-wrap: anywhere;
 }
 
 @keyframes deslizarArriba {
@@ -876,6 +916,38 @@ body.pagina-comunidad {
     display: none;
 }
 
+.perfil-contactos-emergencia {
+    margin-top: 20px;
+    padding: 14px;
+    border-radius: 10px;
+    background: var(--fondo-secundario, #f5f7fa);
+    text-align: left;
+}
+
+.perfil-contactos-emergencia h4 {
+    margin: 0 0 10px;
+    color: var(--verde-oscuro);
+    font-size: 14px;
+}
+
+.perfil-contactos-emergencia ul {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.perfil-contactos-emergencia a {
+    color: var(--verde-oscuro);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.perfil-contactos-emergencia[hidden] {
+    display: none;
+}
+
 .btn-borrar-anuncio {
     flex: 0 0 auto;
     padding: 8px;
@@ -896,6 +968,11 @@ body.pagina-comunidad {
 
     .comunidad-main-grid {
         grid-template-columns: 1fr;
+        grid-template-areas:
+            "miembros"
+            "anuncios"
+            "servicios"
+            "lugares";
     }
 }
 
@@ -948,6 +1025,7 @@ body.pagina-comunidad {
     .modal-content-lista {
         width: calc(100vw - 24px);
         max-height: 86vh;
+        max-height: 86dvh;
     }
 
     .modal-content-lista .modal-header,
@@ -957,6 +1035,15 @@ body.pagina-comunidad {
 
     .item-autoridad {
         flex-wrap: wrap;
+    }
+
+    .comunidad-lista-acciones {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .comunidad-lista-acciones .btn-secundario-pequeno {
+        min-height: 38px;
     }
 
 }

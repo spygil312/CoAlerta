@@ -772,6 +772,9 @@ function obtenerHoraAlerta(alerta) {
 }
 
 function ubicacionAlerta(alerta) {
+    if (typeof alerta.direccion === "string" && alerta.direccion.trim()) {
+        return alerta.direccion.trim();
+    }
     const latitude = Number(alerta.latitud);
     const longitude = Number(alerta.longitud);
     return Number.isFinite(latitude) && Number.isFinite(longitude)

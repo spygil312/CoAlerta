@@ -341,7 +341,9 @@ document.addEventListener("DOMContentLoaded", function () {
         navigator.geolocation.getCurrentPosition((position) => {
             securityLocation = {
                 latitud: position.coords.latitude,
-                longitud: position.coords.longitude
+                longitud: position.coords.longitude,
+                precisionMetros: position.coords.accuracy,
+                receivedAt: Date.now()
             };
             locationStatus.textContent = "Ubicación disponible para recibir emergencias cercanas.";
             render();
@@ -595,13 +597,12 @@ document.addEventListener("DOMContentLoaded", function () {
             if (String(incident.id) === selectedIncidentId) marker.openPopup();
             bounds.push(marker.getLatLng());
         });
-        const profile = data.getProfile();
-        const patrol = data.getPatrols().find((item) => item.id === profile.patrullaId);
-        if (patrol && validPoint(patrol)) {
-            L.marker([Number(patrol.latitud), Number(patrol.longitud)], {
+        const unitLocation = getCurrentUnitLocation();
+        if (unitLocation) {
+            L.marker([Number(unitLocation.latitud), Number(unitLocation.longitud)], {
                 icon: L.divIcon({ className: "seguridad-patrol-marker", html: "●", iconSize: [20, 20] })
             }).bindPopup("Ubicación de la unidad").addTo(patrolLayer);
-            bounds.push([Number(patrol.latitud), Number(patrol.longitud)]);
+            bounds.push([Number(unitLocation.latitud), Number(unitLocation.longitud)]);
         }
         if (bounds.length) map.fitBounds(bounds, { padding: [28, 28], maxZoom: 16 });
         updateSelectedDetails(incidents);
@@ -613,12 +614,10 @@ document.addEventListener("DOMContentLoaded", function () {
             selectedDetails.textContent = "Selecciona una alerta de la cola.";
             return;
         }
-        const profile = data.getProfile() || {};
-        const patrol = data.getPatrols().find((item) =>
-            String(item.id) === String(profile.patrullaId || "")
-        );
-        const origin = patrol && validPoint(patrol) ? patrol : securityLocation;
-        const approximateAddress = typeof incident.direccionAproximada === "string" &&
+        const origin = getCurrentUnitLocation();
+        const approximateAddress = typeof incident.direccion === "string" && incident.direccion.trim()
+            ? incident.direccion.trim()
+            : typeof incident.direccionAproximada === "string" &&
             incident.direccionAproximada.trim()
             ? incident.direccionAproximada.trim()
             : typeof incident.ubicacion === "string" && incident.ubicacion.trim()
@@ -641,20 +640,30 @@ document.addEventListener("DOMContentLoaded", function () {
         if (!hasCoordinates(incident) || !map) throw new Error("La alerta no tiene coordenadas válidas.");
         const profile = data.getProfile();
         const patrolId = profile.patrullaId;
-        const patrols = data.getPatrols().filter((patrol) => validPoint(patrol));
-        let origin = patrols.find((patrol) => patrol.id === patrolId);
-        if (!origin && securityLocation) {
-            origin = {
-                latitud: securityLocation.latitud,
-                longitud: securityLocation.longitud,
+        const now = Date.now();
+        const localPoint = latestLocationPoint || securityLocation;
+        const localPointIsFresh = localPoint && validPoint(localPoint) &&
+            Number.isFinite(localPoint.receivedAt) && now - localPoint.receivedAt <= 30 * 1000;
+        let origin = localPointIsFresh
+            ? {
+                latitud: Number(localPoint.latitud),
+                longitud: Number(localPoint.longitud),
                 codigo: "Tu ubicación"
-            };
+            }
+            : null;
+        if (!origin && patrolId) {
+            const patrol = data.getPatrols().find((item) => item.id === patrolId);
+            const updatedAt = getTimestampMillis(patrol && patrol.updatedAt);
+            if (patrol && validPoint(patrol) && Number.isFinite(updatedAt) &&
+                updatedAt <= now && now - updatedAt <= 2 * 60 * 1000) {
+                origin = patrol;
+            }
         }
         if (!origin && data.getRole() === "seguridad" && profile.comunidadId) {
             const member = data.getCommunityMembers().find((item) => item.id === profile.uid);
             const updatedAt = new Date(member && member.ubicacionActualizadaAt || 0).getTime();
             if (member && member.ubicacionCompartida === true &&
-                Date.now() - updatedAt <= 2 * 60 * 1000 && validPoint(member)) {
+                updatedAt <= now && now - updatedAt <= 2 * 60 * 1000 && validPoint(member)) {
                 origin = {
                     latitud: Number(member.latitud),
                     longitud: Number(member.longitud),
@@ -676,24 +685,6 @@ document.addEventListener("DOMContentLoaded", function () {
             });
         }
         if (!origin) throw new Error("La unidad aún no tiene ubicación GPS.");
-        if (!window.confirm("Se enviarán las coordenadas de la unidad y la alerta al servicio público OSRM para calcular la ruta. ¿Deseas continuar?")) return;
-        const coordinates = `${Number(origin.longitud)},${Number(origin.latitud)};${Number(incident.longitud)},${Number(incident.latitud)}`;
-        const response = await fetch(
-            `https://router.project-osrm.org/route/v1/driving/${coordinates}?overview=full&geometries=geojson&alternatives=true`,
-            { headers: { Accept: "application/json" } }
-        );
-        if (!response.ok) throw new Error("El servicio de rutas no está disponible. Inténtalo nuevamente.");
-        const result = await response.json();
-        const routes = Array.isArray(result.routes) ? result.routes : [];
-        const route = routes.reduce((shortest, candidate) =>
-            !shortest || candidate.distance < shortest.distance ? candidate : shortest, null
-        );
-        if (!route || !route.geometry) throw new Error("No se encontró una ruta vial.");
-        routeLayer.clearLayers();
-        const line = L.geoJSON(route.geometry, {
-            style: { color: "#1267d6", weight: 6, opacity: .85 }
-        }).addTo(routeLayer);
-        map.fitBounds(line.getBounds(), { padding: [30, 30] });
         const navigationUrl = new URL("https://www.google.com/maps/dir/");
         navigationUrl.searchParams.set("api", "1");
         navigationUrl.searchParams.set("origin", `${origin.latitud},${origin.longitud}`);
@@ -707,14 +698,50 @@ document.addEventListener("DOMContentLoaded", function () {
         navigationLink.rel = "noopener noreferrer";
         navigationLink.className = "seguridad-google-maps-link";
         navigationLink.textContent = "Abrir navegación en Google Maps ↗";
+        routeLayer.clearLayers();
+        map.fitBounds(L.latLngBounds(
+            [Number(origin.latitud), Number(origin.longitud)],
+            [Number(incident.latitud), Number(incident.longitud)]
+        ), { padding: [30, 30] });
         routeStatus.replaceChildren(
             document.createTextNode(
-                `Ruta vial más corta entre las alternativas de OSRM desde ${origin.codigo || origin.codigoPatrulla || "la unidad"}: ` +
-                `${(route.distance / 1000).toLocaleString("es", { maximumFractionDigits: 1 })} km · ` +
-                `${Math.max(1, Math.ceil(route.duration / 60))} min estimados. `
+                `Google Maps calculará la ruta vial desde ${origin.codigo || origin.codigoPatrulla || "la unidad"}. `
             ),
             navigationLink
         );
+    }
+
+    function getCurrentUnitLocation() {
+        const now = Date.now();
+        const localPoint = latestLocationPoint || securityLocation;
+        if (localPoint && validPoint(localPoint) &&
+            Number.isFinite(localPoint.receivedAt) &&
+            localPoint.receivedAt <= now && now - localPoint.receivedAt <= 30 * 1000) {
+            return localPoint;
+        }
+
+        const profile = data.getProfile() || {};
+        if (profile.patrullaId) {
+            const patrol = data.getPatrols().find((item) =>
+                String(item.id) === String(profile.patrullaId)
+            );
+            const updatedAt = getTimestampMillis(patrol && patrol.updatedAt);
+            if (patrol && validPoint(patrol) && Number.isFinite(updatedAt) &&
+                updatedAt <= now && now - updatedAt <= 2 * 60 * 1000) {
+                return patrol;
+            }
+        }
+
+        if (data.getRole() === "seguridad" && profile.comunidadId) {
+            const member = data.getCommunityMembers().find((item) => item.id === profile.uid);
+            const updatedAt = getTimestampMillis(member && member.ubicacionActualizadaAt);
+            if (member && member.ubicacionCompartida === true && validPoint(member) &&
+                Number.isFinite(updatedAt) && updatedAt <= now &&
+                now - updatedAt <= 2 * 60 * 1000) {
+                return member;
+            }
+        }
+        return null;
     }
 
     function getArrivalEligibility(incident) {
@@ -729,14 +756,18 @@ document.addEventListener("DOMContentLoaded", function () {
         const patrolId = String(incident.patrullaId || profile.patrullaId || "");
         const patrol = data.getPatrols().find((item) => String(item.id) === patrolId);
         const localPointIsFresh = latestLocationPoint &&
+            validPoint(latestLocationPoint) &&
             Number.isFinite(latestLocationPoint.receivedAt) &&
-            now - latestLocationPoint.receivedAt <= 15000;
+            now - latestLocationPoint.receivedAt >= -10000 &&
+            now - latestLocationPoint.receivedAt <= 2 * 60 * 1000;
         const patrolUpdatedAt = getTimestampMillis(patrol && patrol.updatedAt);
         const patrolPointIsFresh = patrol && patrol.estado === "Despachado" &&
             String(patrol.incidenteId || "") === String(incident.id) &&
-            Number.isFinite(patrolUpdatedAt) &&
-            patrolUpdatedAt <= now &&
-            now - patrolUpdatedAt <= 2 * 60 * 1000;
+            validPoint(patrol) &&
+            (Number.isFinite(patrolUpdatedAt) &&
+                now - patrolUpdatedAt >= -10000 &&
+                now - patrolUpdatedAt <= 2 * 60 * 1000 ||
+                patrol._hasPendingWrites === true && !Number.isFinite(patrolUpdatedAt));
         const point = localPointIsFresh
             ? latestLocationPoint
             : patrolPointIsFresh
@@ -744,25 +775,27 @@ document.addEventListener("DOMContentLoaded", function () {
                     latitud: Number(patrol.latitud),
                     longitud: Number(patrol.longitud),
                     precisionMetros: Number(patrol.precisionMetros),
-                    receivedAt: patrolUpdatedAt
+                    receivedAt: Number.isFinite(patrolUpdatedAt) ? patrolUpdatedAt : now
                 }
                 : null;
         if (!point || !validPoint(point) || !Number.isFinite(Number(point.precisionMetros)) ||
-            Number(point.precisionMetros) >= 15 ||
-            !Number.isFinite(point.receivedAt) || now - point.receivedAt > 2 * 60 * 1000) {
+            Number(point.precisionMetros) <= 0 ||
+            Number(point.precisionMetros) > 50000 ||
+            !Number.isFinite(point.receivedAt) || now - point.receivedAt < -10000 ||
+            now - point.receivedAt > 2 * 60 * 1000) {
             return {
                 allowed: false,
-                message: "No hay una ubicación GPS de la unidad reciente y precisa. Activa el GPS y espera una lectura con precisión menor a 15 m."
+                message: "No hay una ubicación GPS reciente válida de la unidad. Activa el GPS y vuelve a intentarlo."
             };
         }
         const distance = data.distanceMeters(point, incident);
-        if (distance >= 15) {
+        if (distance > 15) {
             return {
                 allowed: false,
-                message: `Acércate a menos de 15 m del emisor para marcar llegada (distancia actual: ${Math.round(distance)} m).`
+                message: `Acércate a 15 m o menos del emisor para marcar llegada (distancia actual: ${Math.round(distance)} m).`
             };
         }
-        return { allowed: true, message: "Unidad a menos de 15 m del emisor." };
+        return { allowed: true, message: "Unidad a 15 m o menos del emisor." };
     }
 
     function startLocationSharing() {
@@ -801,16 +834,27 @@ document.addEventListener("DOMContentLoaded", function () {
             const point = latestLocationPoint;
             const profile = data.getProfile();
             if (!profile) throw new Error("No se encontró el perfil de seguridad para sincronizar la ubicación.");
-            if (data.getRole() === "seguridad" && profile.comunidadId && !profile.patrullaId) {
-                await data.updateSecurityLocation(point);
+            // La ubicación del personal de serenazgo se publica siempre en su documento de
+            // miembro de la comunidad (es lo que dibuja el mapa), tenga o no patrulla asignada.
+            // Si falla, no debe impedir la actualización de la patrulla ni el despacho.
+            let memberLocationError = null;
+            if (data.getRole() === "seguridad" && profile.comunidadId) {
+                try {
+                    await data.updateSecurityLocation(point);
+                } catch (memberError) {
+                    memberLocationError = memberError;
+                    console.error("No se pudo publicar la ubicación de serenazgo en el mapa:", memberError);
+                }
             }
             if (profile.patrullaId) {
                 stage = "actualizar la ubicación de la unidad y habilitar el despacho";
                 await data.updatePatrolLocation(point);
             }
+            if (memberLocationError && !profile.patrullaId) throw memberLocationError;
             lastLocation = point;
             locationStatus.textContent =
-                `Ubicación actualizada · precisión ±${Math.round(point.precisionMetros)} m.`;
+                `Ubicación actualizada · precisión ±${Math.round(point.precisionMetros)} m · ` +
+                `${point.latitud.toFixed(5)}, ${point.longitud.toFixed(5)}.`;
             render();
         } catch (error) {
             console.error(`No se pudo ${stage}:`, error);
@@ -866,6 +910,9 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function getIncidentLocationLabel(incident) {
+        if (typeof incident.direccion === "string" && incident.direccion.trim()) {
+            return incident.direccion.trim();
+        }
         if (typeof incident.ubicacion === "string" && incident.ubicacion.trim()) {
             return incident.ubicacion.trim();
         }
@@ -890,15 +937,32 @@ document.addEventListener("DOMContentLoaded", function () {
         if (!profile.comunidadId) {
             return { allowed: false, message: "Únete a una comunidad para atender sus alertas." };
         }
-        const timestamp = getTimestampMillis(profile.ultimaUbicacion && profile.ultimaUbicacion.timestamp);
-        const age = Date.now() - timestamp;
-        if (!Number.isFinite(timestamp) || age < 0 || age >= 300000) {
+        const now = Date.now();
+        const localTimestamp = latestLocationPoint && latestLocationPoint.receivedAt;
+        const localLocationIsFresh = latestLocationPoint && validPoint(latestLocationPoint) &&
+            Number.isFinite(localTimestamp) && now - localTimestamp >= -10000 &&
+            now - localTimestamp < 2 * 60 * 1000;
+        const patrol = data.getPatrols().find((item) =>
+            String(item.id) === String(profile.patrullaId)
+        );
+        const patrolTimestamp = getTimestampMillis(patrol && patrol.updatedAt);
+        const patrolLocationIsFresh = patrol && validPoint(patrol) &&
+            (Number.isFinite(patrolTimestamp) && now - patrolTimestamp >= -10000 &&
+                now - patrolTimestamp < 2 * 60 * 1000 ||
+                patrol._hasPendingWrites === true && !Number.isFinite(patrolTimestamp));
+        if (!localLocationIsFresh && !patrolLocationIsFresh) {
             return {
                 allowed: false,
                 message: "No hay GPS reciente. Pulsa «Activar GPS para habilitar despacho» y permite el acceso a la ubicación."
             };
         }
-        return { allowed: true, message: "" };
+        return {
+            allowed: true,
+            message: "",
+            timestamp: localLocationIsFresh
+                ? localTimestamp
+                : Number.isFinite(patrolTimestamp) ? patrolTimestamp : now
+        };
     }
 
     function updateDispatchReadiness(overrideMessage) {
@@ -923,8 +987,8 @@ document.addEventListener("DOMContentLoaded", function () {
             button.title = status.message;
         });
         if (status.allowed) {
-            const timestamp = getTimestampMillis(dispatchProfile.ultimaUbicacion.timestamp);
-            const remaining = Math.max(0, 300000 - (Date.now() - timestamp));
+            const timestamp = status.timestamp;
+            const remaining = Math.max(0, 2 * 60 * 1000 - (Date.now() - timestamp));
             dispatchExpiryTimer = window.setTimeout(() => {
                 dispatchExpiryTimer = null;
                 updateDispatchReadiness();

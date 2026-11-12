@@ -1314,10 +1314,14 @@ body.role-security .menu-inferior-mobile a[data-role-link="security"] {
         overflow: visible;
     }
 
+    .historial-card .tabla-responsive {
+        max-height: min(66vh, 680px);
+    }
+
     .historial-registro-layout {
         display: grid;
         grid-template-columns: minmax(0, 1fr) minmax(280px, 300px);
-        align-items: start;
+        align-items: stretch;
         gap: 18px;
     }
 
@@ -1327,7 +1331,7 @@ body.role-security .menu-inferior-mobile a[data-role-link="security"] {
         top: 94px;
         z-index: 1;
         display: flex;
-        align-items: flex-start;
+        align-items: stretch;
         justify-content: stretch;
         background: transparent;
     }

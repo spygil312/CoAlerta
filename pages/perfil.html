@@ -37,7 +37,7 @@
     <link rel="stylesheet" href="../css/estilos.css?v=mobile-nav-fixed-20261102">
     <link rel="stylesheet" href="../css/responsive.css">
     <link rel="stylesheet" href="../css/mapa.css?v=ordered-panels-gps-dispatch-20261029">
-    <link rel="stylesheet" href="../css/perfil.css?v=20261030-mobile-scroll">
+    <link rel="stylesheet" href="../css/perfil.css?v=profile-compact-preferences-contacts-align-20261112">
     <script src="../js/tema.js?v=20261029-theme-scroll"></script>
 </head>
 
@@ -150,7 +150,7 @@
                         <i class="fa-solid fa-user-shield" aria-hidden="true"></i>
                         Cargando...
                     </span>
-                    <p id="estadoSolicitudRol" aria-live="polite">Usuario registrado en CoAlerta</p>
+                    <p id="estadoSolicitudRol" aria-live="polite"></p>
 
                     <div class="perfil-resumen-info">
                         <div>
@@ -167,10 +167,6 @@
                         </div>
                     </div>
 
-                    <div class="perfil-verificado" id="estadoCuenta">
-                        <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
-                        Cuenta activa
-                    </div>
                 </aside>
 
                 <div class="perfil-paneles">
@@ -203,39 +199,41 @@
                                 </div>
                             </div>
 
-                            <div class="grupo-formulario">
-                                <label for="correo">Correo electrónico</label>
-                                <div class="input-con-icono">
-                                    <i class="fa-solid fa-envelope" aria-hidden="true"></i>
-                                    <input type="email" id="correo" autocomplete="email" required>
+                            <div class="perfil-form-grid">
+                                <div class="grupo-formulario">
+                                    <label for="correo">Correo electrónico</label>
+                                    <div class="input-con-icono">
+                                        <i class="fa-solid fa-envelope" aria-hidden="true"></i>
+                                        <input type="email" id="correo" autocomplete="email" required>
+                                    </div>
+                                </div>
+                                <div class="grupo-formulario">
+                                    <label for="telefono">Número de celular</label>
+                                    <div class="input-con-icono">
+                                        <i class="fa-solid fa-phone" aria-hidden="true"></i>
+                                        <input type="tel" id="telefono" inputmode="numeric" maxlength="9"
+                                            autocomplete="tel-national" required>
+                                    </div>
                                 </div>
                             </div>
 
-                            <div class="grupo-formulario">
-                                <label for="telefono">Número de celular</label>
-                                <div class="input-con-icono">
-                                    <i class="fa-solid fa-phone" aria-hidden="true"></i>
-                                    <input type="tel" id="telefono" inputmode="numeric" maxlength="9"
-                                        autocomplete="tel-national" required>
+                            <div class="perfil-form-grid">
+                                <div class="grupo-formulario">
+                                    <label for="rol">Tipo de usuario</label>
+                                    <div class="input-con-icono select-con-icono">
+                                        <i class="fa-solid fa-users" aria-hidden="true"></i>
+                                        <select id="rol" disabled>
+                                            <option selected>Vecino</option>
+                                        </select>
+                                    </div>
+                                    <small class="campo-ayuda">El tipo de usuario no puede modificarse directamente.</small>
                                 </div>
-                            </div>
-
-                            <div class="grupo-formulario">
-                                <label for="rol">Tipo de usuario</label>
-                                <div class="input-con-icono select-con-icono">
-                                    <i class="fa-solid fa-users" aria-hidden="true"></i>
-                                    <select id="rol" disabled>
-                                        <option selected>Vecino</option>
-                                    </select>
-                                </div>
-                                <small class="campo-ayuda">El tipo de usuario no puede modificarse directamente.</small>
-                            </div>
-
-                            <div class="grupo-formulario">
-                                <label for="zona">Dirección de residencia</label>
-                                <div class="input-con-icono">
-                                    <i class="fa-solid fa-location-dot" aria-hidden="true"></i>
-                                    <input type="text" id="zona" autocomplete="address-level3" required>
+                                <div class="grupo-formulario">
+                                    <label for="zona">Dirección de residencia</label>
+                                    <div class="input-con-icono">
+                                        <i class="fa-solid fa-location-dot" aria-hidden="true"></i>
+                                        <input type="text" id="zona" autocomplete="address-level3" required>
+                                    </div>
                                 </div>
                             </div>
 
@@ -414,8 +412,8 @@
                                     </div>
                                     <div>
                                         <strong id="preferenciaAlertasLabel">Notificaciones de alertas</strong>
-                                        <span id="preferenciaAlertasAyuda">Recibe avisos sobre incidentes
-                                            cercanos.</span>
+                                        <span id="preferenciaAlertasAyuda">Muestra alertas en el menú de notificaciones.
+                                            No controla el sonido.</span>
                                     </div>
                                 </div>
                                 <label class="switch">
@@ -431,9 +429,9 @@
                                             aria-hidden="true"></i></div>
                                     <div>
                                         <strong id="preferenciaSonidoLabel">Sonido de emergencia</strong>
-                                        <span id="preferenciaSonidoAyuda">Reproduce un tono cuando llegue una alerta
-                                            activa nueva. El navegador puede requerir una interacción para habilitar el
-                                            audio.</span>
+                                        <span id="preferenciaSonidoAyuda">Activa o silencia el tono de alertas y avisos,
+                                            independientemente de mostrarlos. El navegador puede requerir una interacción
+                                            para habilitar el audio.</span>
                                     </div>
                                 </div>
                                 <label class="switch">
@@ -550,10 +548,10 @@
     </nav>
 
     <script type="module" src="../js/estado-cuenta.js?v=modular-sdk-1"></script>
-    <script type="module" src="../js/coalerta-data.js?v=active-delegation-role-20261101"></script>
-    <script src="../js/ubicacion.js"></script>
-    <script src="../js/notificaciones.js?v=expire-notifications-20261110"></script>
-    <script type="module" src="../js/perfil.js?v=shared-core-20261106"></script>
+    <script type="module" src="../js/coalerta-data.js?v=onsite-gps-sync-20261112-emergency-contacts-20261113"></script>
+    <script src="../js/ubicacion.js?v=shared-distance-utils-20261111"></script>
+    <script src="../js/notificaciones.js?v=alerts-sound-independent-20261112"></script>
+    <script type="module" src="../js/perfil.js?v=profile-role-inline-20261112"></script>
 </body>
 
 </html>
