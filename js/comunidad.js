@@ -600,12 +600,12 @@ document.addEventListener('DOMContentLoaded', () => {
         );
     }
 
-    // Deja los centros de salud y comisarías encontrados disponibles para el
-    // panel de mapa (pages/mapa.html), que los dibuja como marcadores.
+    // Deja todos los lugares cercanos disponibles para el panel de mapa
+    // (pages/mapa.html), que los dibuja como marcadores.
     // Solo se guardan en esta pestaña (sessionStorage), igual que la ubicación.
     function guardarLugaresParaMapa(lugares) {
         try {
-            const tiposEnMapa = ['salud', 'comisaria', 'serenazgo'];
+            const tiposEnMapa = ['salud', 'comisaria', 'serenazgo', 'bomberos', 'municipalidad'];
             const compactos = lugares
                 .filter((lugar) => tiposEnMapa.includes(lugar.tipo))
                 .map((lugar) => ({
