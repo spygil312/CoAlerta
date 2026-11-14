@@ -1,4 +1,5 @@
 document.addEventListener("DOMContentLoaded", function () {
+    const maxReportGpsAccuracyMetros = 1000000;
     const modal = document.getElementById("modalEmergencia");
     const grid = document.querySelector(".modal-alertas-grid");
     const countdown = document.getElementById("confirmacionCuentaRegresiva");
@@ -218,12 +219,11 @@ document.addEventListener("DOMContentLoaded", function () {
                 );
             }
             const position = result.position;
-            const precisionMetros = esEntornoLocal()
-                ? 4
-                : position.coords.accuracy;
-            if (!Number.isFinite(precisionMetros) || precisionMetros >= 5) {
+            const precisionMetros = position.coords.accuracy;
+            if (!Number.isFinite(precisionMetros) || precisionMetros <= 0 ||
+                precisionMetros > maxReportGpsAccuracyMetros) {
                 throw new Error(
-                    `La precisión GPS debe ser menor a 5 metros (actual: ±${Number(precisionMetros).toFixed(2)} m). Busca una señal más precisa e inténtalo nuevamente. No se envió ninguna alerta.`
+                    "El navegador no proporcionó una precisión GPS válida. Revisa los permisos de ubicación e inténtalo nuevamente. No se envió ninguna alerta."
                 );
             }
             if (!gpsConsent || !gpsConsent.checked) {
@@ -258,7 +258,14 @@ document.addEventListener("DOMContentLoaded", function () {
             window.dispatchEvent(new CustomEvent("coalerta:alerta-reportada", {
                 detail: { alerta: submittedAlert }
             }));
-            showFeedback("Alerta recibida por la central", "success", "fa-solid fa-circle-check");
+            const precisionTexto = precisionMetros >= 1000
+                ? `${(precisionMetros / 1000).toFixed(1)} km`
+                : `${Math.round(precisionMetros)} m`;
+            showFeedback(
+                `Alerta recibida por la central. Ubicación aproximada (margen estimado ±${precisionTexto}).`,
+                "success",
+                "fa-solid fa-circle-check"
+            );
             if (gpsConsent) gpsConsent.checked = false;
             if (detailInput) detailInput.value = "";
             if (detailCounter) detailCounter.textContent = "0";
@@ -779,10 +786,6 @@ document.addEventListener("DOMContentLoaded", function () {
         if (countdown) countdown.hidden = true;
         if (grid) grid.hidden = false;
         showFeedback(message, "error");
-    }
-
-    function esEntornoLocal() {
-        return window.coalertaEsEntornoLocal();
     }
 
     function showFeedback(message, type, iconClass = "") {

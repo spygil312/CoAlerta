@@ -891,8 +891,9 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
             !Number.isFinite(longitud) || longitud < -180 || longitud > 180) {
             throw new Error("La ubicación GPS no es válida.");
         }
-        if (!Number.isFinite(precisionMetros) || precisionMetros <= 0 || precisionMetros >= 5) {
-            throw new Error("La precisión GPS debe ser menor a 5 metros.");
+        if (!Number.isFinite(precisionMetros) || precisionMetros <= 0 ||
+            precisionMetros > 1000000) {
+            throw new Error("El navegador no proporcionó una precisión GPS válida.");
         }
         const direccion = await obtenerDireccionInversa(latitud, longitud);
 

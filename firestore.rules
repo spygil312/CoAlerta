@@ -1391,7 +1391,7 @@ service cloud.firestore {
         && data.longitud <= 180
         && data.precisionMetros is number
         && data.precisionMetros > 0
-        && data.precisionMetros <= 100000
+        && data.precisionMetros <= 1000000
         && data.prioridad == (data.categoria == 'sospecha' ? 'Media' : 'Alta')
         && data.estado == 'Recibido en servidor'
         && data.timestamp == request.time
@@ -1666,7 +1666,7 @@ service cloud.firestore {
           || data.categoria in ['robo', 'sospecha', 'accidente', 'incendio']
             && data.precisionMetros is number
             && data.precisionMetros > 0
-            && data.precisionMetros < 5
+            && data.precisionMetros <= 1000000
         )
         && data.timestamp is timestamp
         && (
@@ -1721,7 +1721,7 @@ service cloud.firestore {
         && data.categoria in ['robo', 'sospecha', 'accidente', 'incendio']
         && data.precisionMetros is number
         && data.precisionMetros > 0
-        && data.precisionMetros < 5
+        && data.precisionMetros <= 1000000
         && data.creadorId == request.auth.uid
         && data.timestamp == request.time
         && throttle.uid == request.auth.uid

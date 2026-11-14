@@ -9,6 +9,7 @@
     const countdownNumber = document.getElementById("cuentaRegresivaNumeroAnonima");
     const progress = document.getElementById("cuentaRegresivaProgresoAnonima");
     const cancelButton = document.getElementById("btnCancelarAlertaAnonima");
+    const maxReportGpsAccuracyMetros = 1000000;
     let activeTimer = null;
     let sending = false;
 
@@ -108,11 +109,12 @@
                 !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
                 throw new Error("El dispositivo devolvió una ubicación no válida.");
             }
-            const precisionMetros = esEntornoLocal() ? 4 : accuracy;
-            if (!Number.isFinite(precisionMetros) || precisionMetros >= 5) {
+            const precisionMetros = accuracy;
+            if (!Number.isFinite(precisionMetros) || precisionMetros <= 0 ||
+                precisionMetros > maxReportGpsAccuracyMetros) {
                 throw createLocationError(
-                    "location/precision-insufficient",
-                    `La precisión GPS debe ser menor a 5 metros (actual: ±${Number(precisionMetros).toFixed(2)} m). Busca una señal más precisa e inténtalo nuevamente. No se envió ninguna alerta.`
+                    "location/precision-invalid",
+                    "El navegador no proporcionó una precisión GPS válida. Revisa los permisos de ubicación e inténtalo nuevamente. No se envió ninguna alerta."
                 );
             }
             if (!gpsConsent.checked) {
@@ -143,7 +145,8 @@
             if (detailInput) detailInput.disabled = false;
             countdown.hidden = true;
             showStatus(
-                `Emergencia registrada${direccion ? ` en ${direccion}` : ""}. Código: ${alertId}.`,
+                `Emergencia registrada${direccion ? ` en ${direccion}` : ""}. ` +
+                    `Ubicación aproximada (margen estimado ±${formatGpsAccuracy(precisionMetros)}). Código: ${alertId}.`,
                 "success"
             );
         } catch (error) {
@@ -336,8 +339,10 @@
         return error;
     }
 
-    function esEntornoLocal() {
-        return window.coalertaEsEntornoLocal();
+    function formatGpsAccuracy(accuracy) {
+        return accuracy >= 1000
+            ? `${(accuracy / 1000).toFixed(1)} km`
+            : `${Math.round(accuracy)} m`;
     }
 
     function getUserMessage(error) {
