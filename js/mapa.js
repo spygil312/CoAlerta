@@ -22,7 +22,16 @@ const TIPOS_LUGAR_MAPA = {
     municipalidad: { icono: "fa-landmark", color: "marcador-lugar", etiqueta: "Municipalidad" },
     lugar: { icono: "fa-location-dot", color: "marcador-lugar", etiqueta: "Lugar importante" }
 };
-const TIPOS_LUGAR_PERMANENTES = ["salud", "comisaria", "serenazgo"];
+const TIPOS_LUGAR_PERMANENTES = ["salud", "comisaria", "serenazgo", "bomberos", "municipalidad"];
+const ICONOS_LUGAR_MAPA = new Map();
+const DATOS_ICONO_LUGAR_MAPA = {
+    salud: { color: "#d6336c", simbolo: "+" },
+    comisaria: { color: "#4338ca", simbolo: "P" },
+    serenazgo: { color: "#087f8c", simbolo: "S" },
+    bomberos: { color: "#64748b", simbolo: "B" },
+    municipalidad: { color: "#64748b", simbolo: "M" },
+    lugar: { color: "#64748b", simbolo: "•" }
+};
 window.coalertaEstadoUbicacionMapa = "pending";
 window.coalertaUbicacionMapa = null;
 
@@ -37,7 +46,7 @@ document.addEventListener("DOMContentLoaded", function () {
         return;
     }
 
-    window.map = L.map(elementoMapa, { zoomControl: true })
+    window.map = L.map(elementoMapa, { zoomControl: true, preferCanvas: true })
         .setView([-12.0990, -77.0360], 15);
     const query = new URLSearchParams(window.location.search);
     const latitudeValue = query.get("lat");
@@ -60,7 +69,15 @@ document.addEventListener("DOMContentLoaded", function () {
     window.grupoMarcadoresAlertas = L.layerGroup().addTo(window.map);
     window.marcadoresAlertas = [];
     const grupoMarcadoresSerenazgo = L.layerGroup().addTo(window.map);
-    const grupoMarcadoresLugares = L.layerGroup().addTo(window.map);
+    const grupoMarcadoresLugares = typeof L.markerClusterGroup === "function"
+        ? L.markerClusterGroup({
+            chunkedLoading: true,
+            chunkInterval: 100,
+            chunkDelay: 25,
+            removeOutsideVisibleBounds: true,
+            showCoverageOnHover: false
+        }).addTo(window.map)
+        : L.layerGroup().addTo(window.map);
 
     const tileLayer = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}", {
         maxZoom: 19,
@@ -286,9 +303,8 @@ function leerLugaresGuardados() {
 function crearMarcadorLugar(lugar) {
     const tipo = TIPOS_LUGAR_MAPA[lugar.tipo] || TIPOS_LUGAR_MAPA.lugar;
     const marcador = L.marker([lugar.latitud, lugar.longitud], {
-        icon: crearIconoMapa(tipo.icono, tipo.color),
-        zIndexOffset: -100,
-        title: lugar.nombre
+        icon: obtenerIconoLugarMapa(lugar.tipo),
+        zIndexOffset: -100
     });
     const popup = document.createElement("div");
     popup.className = "popup-coalerta";
@@ -301,17 +317,19 @@ function crearMarcadorLugar(lugar) {
     return marcador;
 }
 
-// Dibuja los centros de salud y comisarías encontrados en "Mi comunidad" y,
-// si se llegó desde un enlace de esa página, abre el lugar seleccionado.
+// Dibuja los lugares cercanos guardados desde "Mi comunidad" y enfoca el
+// lugar seleccionado cuando se llega desde un enlace de esa página.
 function mostrarLugaresCercanosEnMapa(capa, lugarObjetivo) {
     if (!capa) return;
     capa.clearLayers();
     const margen = 0.0002; // ≈ 22 m
     let elegido = null;
     let menorDistancia = Infinity;
+    const marcadores = [];
 
     leerLugaresGuardados().forEach((lugar) => {
-        const marcador = crearMarcadorLugar(lugar).addTo(capa);
+        const marcador = crearMarcadorLugar(lugar);
+        marcadores.push(marcador);
         if (!lugarObjetivo) return;
         const dLat = Math.abs(lugar.latitud - lugarObjetivo.latitud);
         const dLng = Math.abs(lugar.longitud - lugarObjetivo.longitud);
@@ -332,9 +350,25 @@ function mostrarLugaresCercanosEnMapa(capa, lugarObjetivo) {
             tipo: TIPOS_LUGAR_MAPA[lugarObjetivo.tipo] ? lugarObjetivo.tipo : "lugar",
             latitud: lugarObjetivo.latitud,
             longitud: lugarObjetivo.longitud
-        }).addTo(capa);
+        });
+        marcadores.push(elegido);
     }
-    if (elegido) elegido.openPopup();
+    if (elegido) {
+        marcadores.splice(marcadores.indexOf(elegido), 1);
+        marcadores.unshift(elegido);
+    }
+    if (typeof capa.addLayers === "function") {
+        capa.addLayers(marcadores);
+    } else {
+        marcadores.forEach((marcador) => capa.addLayer(marcador));
+    }
+    if (!elegido) return;
+    if (typeof capa.zoomToShowLayer === "function") {
+        capa.zoomToShowLayer(elegido, () => elegido.openPopup());
+    } else {
+        window.map.setView(elegido.getLatLng(), 17);
+        elegido.openPopup();
+    }
 }
 
 function configurarPanelAlertasMovil() {
@@ -425,6 +459,22 @@ function crearIconoMapa(icono, color) {
         iconAnchor: [21, 42],
         popupAnchor: [0, -42]
     });
+}
+
+function obtenerIconoLugarMapa(tipo) {
+    const categoria = DATOS_ICONO_LUGAR_MAPA[tipo] ? tipo : "lugar";
+    if (ICONOS_LUGAR_MAPA.has(categoria)) return ICONOS_LUGAR_MAPA.get(categoria);
+
+    const { color, simbolo } = DATOS_ICONO_LUGAR_MAPA[categoria];
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 32 40"><path fill="${color}" d="M16 0C7.2 0 0 7.2 0 16c0 11.4 16 24 16 24s16-12.6 16-24C32 7.2 24.8 0 16 0z"/><circle cx="16" cy="15" r="10" fill="#fff"/><text x="16" y="20" text-anchor="middle" font-family="Arial,sans-serif" font-size="14" font-weight="700" fill="${color}">${simbolo}</text></svg>`;
+    const icono = L.icon({
+        iconUrl: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
+        iconSize: [32, 40],
+        iconAnchor: [16, 40],
+        popupAnchor: [0, -36]
+    });
+    ICONOS_LUGAR_MAPA.set(categoria, icono);
+    return icono;
 }
 
 function agregarMarcadorAlerta(alerta) {
