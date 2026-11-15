@@ -43,6 +43,7 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
         communityMembersUnsubscribe: null,
         listeners: []
     };
+    const communityIncidentSyncs = new Map();
 
     function normalizeCategory(value) {
         const category = String(value || "").normalize("NFD")
@@ -253,8 +254,8 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
 
     function watchOperationalData() {
         if (state.operationalDataReady || !isOperationalPage()) return;
-        const communityId = String(state.profile && state.profile.comunidadId || "").trim();
-        if (!state.isAdmin && !communityId) return;
+        const communityId = String(state.profile && state.profile.comunidadId || "");
+        if (!state.isAdmin && !communityId.trim()) return;
 
         state.operationalDataReady = true;
         watch(
@@ -704,9 +705,20 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
             const id = alert.alertaId || alert.id;
             const publicAlert = alerts.get(id);
             if (publicAlert) {
+                const hasExactCoordinates = Number.isFinite(alert.latitud) &&
+                    alert.latitud >= -90 && alert.latitud <= 90 &&
+                    Number.isFinite(alert.longitud) &&
+                    alert.longitud >= -180 && alert.longitud <= 180;
                 alerts.set(id, {
                     ...alert,
                     ...publicAlert,
+                    ...(hasExactCoordinates ? {
+                        latitud: alert.latitud,
+                        longitud: alert.longitud
+                    } : {}),
+                    ...(typeof alert.direccion === "string" && alert.direccion.trim()
+                        ? { direccion: alert.direccion }
+                        : {}),
                     unidad: alert.unidad || null,
                     vehiculo: alert.vehiculo || null,
                     etaMinutos: alert.etaMinutos || null,
@@ -1036,7 +1048,15 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
                         ultimaActualizacion: reportTimestamp,
                         detalle: current.detalle
                     });
-                    return { incidentId: groupCandidate.ref.id, agrupada: true, reportes: groupedIncident.reportes };
+                    return {
+                        incidentId: groupCandidate.ref.id,
+                        agrupada: true,
+                        reportes: groupedIncident.reportes,
+                        latitud: current.latitud,
+                        longitud: current.longitud,
+                        direccion: current.direccion || "",
+                        precisionMetros: current.precisionMetros
+                    };
                 }
             }
 
@@ -1095,10 +1115,18 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
                 ultimaActualizacion: reportTimestamp,
                 detalle
             });
-            return { incidentId: newIncidentRef.id, agrupada: false, reportes: 1 };
+            return {
+                incidentId: newIncidentRef.id,
+                agrupada: false,
+                reportes: 1,
+                latitud,
+                longitud,
+                direccion,
+                precisionMetros
+            };
         });
 
-        return { ...result, direccion };
+        return result;
     }
 
     async function obtenerDireccionInversa(latitud, longitud) {
@@ -1637,41 +1665,56 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
         });
     }
 
-    async function synchronizeOwnIncidentsToCommunity(uid = state.uid, communityId = state.profile && state.profile.comunidadId) {
-        if (!uid || !communityId) return 0;
-        const snapshot = await getDocs(query(
-            collection(db, "incidentes"),
-            where("reporterUids", "array-contains", uid)
-        ));
-        let synchronized = 0;
-        for (const incident of snapshot.docs) {
-            const publicRef = doc(db, "alertas_publicas", incident.id);
-            const updated = await runTransaction(db, async (transaction) => {
-                const currentIncident = await transaction.get(incident.ref);
-                if (!currentIncident.exists()) return false;
-                const assignedCommunity = currentIncident.get("comunidadId");
-                if (assignedCommunity === communityId) return false;
-                if (assignedCommunity !== null && assignedCommunity !== undefined && assignedCommunity !== "") {
-                    return false;
-                }
-                const publicAlert = await transaction.get(publicRef);
-                if (!publicAlert.exists()) {
-                    throw new Error(`No se encontró la alerta pública asociada al incidente ${incident.id}.`);
-                }
-                const updatedAt = serverTimestamp();
-                transaction.update(incident.ref, {
-                    comunidadId: communityId,
-                    ultimaActualizacion: updatedAt
-                });
-                transaction.update(publicRef, {
-                    comunidadId: communityId,
-                    ultimaActualizacion: updatedAt
-                });
-                return true;
+    function synchronizeOwnIncidentsToCommunity(uid = state.uid, communityId = state.profile && state.profile.comunidadId) {
+        if (!uid || !communityId) return Promise.resolve(0);
+        const syncKey = `${uid}:${communityId}`;
+        const existingSync = communityIncidentSyncs.get(syncKey);
+        if (existingSync) return existingSync;
+
+        const sync = (async () => {
+            const snapshot = await getDocs(query(
+                collection(db, "incidentes"),
+                where("reporterUids", "array-contains", uid)
+            ));
+            const unassignedIncidents = snapshot.docs.filter((incident) => {
+                const assignedCommunity = incident.get("comunidadId");
+                return assignedCommunity === null || assignedCommunity === undefined ||
+                    assignedCommunity === "";
             });
-            if (updated) synchronized += 1;
-        }
-        return synchronized;
+            let synchronized = 0;
+            for (const incident of unassignedIncidents) {
+                const publicRef = doc(db, "alertas_publicas", incident.id);
+                const updated = await runTransaction(db, async (transaction) => {
+                    const currentIncident = await transaction.get(incident.ref);
+                    if (!currentIncident.exists()) return false;
+                    const assignedCommunity = currentIncident.get("comunidadId");
+                    if (assignedCommunity !== null && assignedCommunity !== undefined &&
+                        assignedCommunity !== "") return false;
+                    const publicAlert = await transaction.get(publicRef);
+                    if (!publicAlert.exists()) {
+                        throw new Error(`No se encontró la alerta pública asociada al incidente ${incident.id}.`);
+                    }
+                    const updatedAt = serverTimestamp();
+                    transaction.update(incident.ref, {
+                        comunidadId: communityId,
+                        ultimaActualizacion: updatedAt
+                    });
+                    transaction.update(publicRef, {
+                        comunidadId: communityId,
+                        ultimaActualizacion: updatedAt
+                    });
+                    return true;
+                });
+                if (updated) synchronized += 1;
+            }
+            return synchronized;
+        })();
+        communityIncidentSyncs.set(syncKey, sync);
+        return sync.finally(() => {
+            if (communityIncidentSyncs.get(syncKey) === sync) {
+                communityIncidentSyncs.delete(syncKey);
+            }
+        });
     }
 
     async function saveCoverageZone(zone) {

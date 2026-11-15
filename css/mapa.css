@@ -594,9 +594,10 @@ body.role-security .menu-inferior-mobile a[data-role-link="security"] {
 .marcador-azul { background: var(--azul-principal); }
 .marcador-naranja { background: var(--naranja); }
 .marcador-verde { background: var(--verde-principal); }
-.marcador-serenazgo { background: #087f8c; }
-.marcador-salud { background: #d6336c; }
-.marcador-comisaria { background: #4338ca; }
+.marcador-serenazgo { background: #00796b; }
+.marcador-salud { background: #d81b60; }
+.marcador-comisaria { background: #3949ab; }
+.marcador-bomberos { background: #d32f2f; }
 .marcador-lugar { background: #64748b; }
 
 .leyenda-punto {
@@ -608,7 +609,7 @@ body.role-security .menu-inferior-mobile a[data-role-link="security"] {
 
 .leyenda-serenazgo {
     width: 10px;
-    color: #087f8c;
+    color: #00796b;
     text-align: center;
 }
 
@@ -617,8 +618,10 @@ body.role-security .menu-inferior-mobile a[data-role-link="security"] {
     text-align: center;
 }
 
-.leyenda-lugar-salud { color: #d6336c; }
-.leyenda-lugar-comisaria { color: #4338ca; }
+.leyenda-lugar-salud { color: #d81b60; }
+.leyenda-lugar-comisaria { color: #3949ab; }
+.leyenda-lugar-bomberos { color: #d32f2f; }
+.leyenda-lugar-municipalidad { color: #64748b; }
 
 .leyenda-punto.rojo { background: var(--rojo); }
 .leyenda-punto.amarillo { background: var(--amarillo); }

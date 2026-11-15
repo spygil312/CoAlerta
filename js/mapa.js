@@ -17,12 +17,40 @@ const VIGENCIA_LUGARES_MAPA_MS = 30 * 60 * 1000;
 const TIPOS_LUGAR_MAPA = {
     salud: { icono: "fa-kit-medical", color: "marcador-salud", etiqueta: "Centro de salud" },
     comisaria: { icono: "fa-shield-halved", color: "marcador-comisaria", etiqueta: "Comisaría / policía" },
-    serenazgo: { icono: "fa-shield-halved", color: "marcador-comisaria", etiqueta: "Serenazgo / seguridad ciudadana" },
-    bomberos: { icono: "fa-fire-extinguisher", color: "marcador-lugar", etiqueta: "Estación de bomberos" },
+    serenazgo: { icono: "fa-shield-halved", color: "marcador-serenazgo", etiqueta: "Serenazgo / seguridad ciudadana" },
+    bomberos: { icono: "fa-fire-extinguisher", color: "marcador-bomberos", etiqueta: "Estación de bomberos" },
     municipalidad: { icono: "fa-landmark", color: "marcador-lugar", etiqueta: "Municipalidad" },
     lugar: { icono: "fa-location-dot", color: "marcador-lugar", etiqueta: "Lugar importante" }
 };
-const TIPOS_LUGAR_PERMANENTES = ["salud", "comisaria", "serenazgo"];
+const TIPOS_LUGAR_PERMANENTES = ["salud", "comisaria", "serenazgo", "bomberos", "municipalidad"];
+const ICONOS_LUGAR_MAPA = new Map();
+const SILUETA_PIN_LUGAR_MAPA = "M16 1.25C7.86 1.25 1.25 7.86 1.25 16c0 10.68 14.75 21.6 14.75 21.6S30.75 26.68 30.75 16C30.75 7.86 24.14 1.25 16 1.25z";
+const DATOS_ICONO_LUGAR_MAPA = {
+    salud: {
+        color: "#d81b60",
+        dibujo: '<path d="M10 11h12v9H10zM13 11V9.5A1.5 1.5 0 0 1 14.5 8h3A1.5 1.5 0 0 1 19 9.5V11" fill="none" stroke="#ffffff" stroke-width="1.8" stroke-linejoin="round"/><path d="M16 13v5m-2.5-2.5h5" fill="none" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round"/>'
+    },
+    comisaria: {
+        color: "#3949ab",
+        dibujo: '<path d="M16 7.5 23 10v5.5c0 4-2.8 7-7 9-4.2-2-7-5-7-9V10z" fill="none" stroke="#ffffff" stroke-width="2" stroke-linejoin="round"/><path d="m12.5 15.2 2.2 2.2 4.8-4.8" fill="none" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>'
+    },
+    serenazgo: {
+        color: "#00796b",
+        dibujo: '<circle cx="12.5" cy="10" r="2.4" fill="#ffffff"/><path d="M8.5 20c.4-3.2 1.8-5.3 4-5.3s3.6 2.1 4 5.3z" fill="#ffffff"/><path d="m20 12 3 1.1v2.3c0 1.8-1.1 3.2-3 4.2-1.9-1-3-2.4-3-4.2v-2.3z" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linejoin="round"/><path d="m18.7 15.5 1 1 1.7-1.9" fill="none" stroke="#ffffff" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>'
+    },
+    bomberos: {
+        color: "#d32f2f",
+        dibujo: '<path d="M17 7c.7 3.1-1 4.2-1.8 5.2-.3-1.6-1.3-2.8-3.1-4.1.1 2.7-3.4 4.6-3.4 8.1a7.3 7.3 0 0 0 14.6 0c0-3.4-2.1-6.3-6.3-9.2z" fill="#ffffff"/>'
+    },
+    municipalidad: {
+        color: "#64748b",
+        dibujo: '<path d="m16 7 8 4H8zm-6 6h2v7h-2zm5 0h2v7h-2zm5 0h2v7h-2zM8 21h16v2H8z" fill="#ffffff"/>'
+    },
+    lugar: {
+        color: "#64748b",
+        dibujo: '<path d="m16 8 2.2 5.8L24 16l-5.8 2.2L16 24l-2.2-5.8L8 16l5.8-2.2z" fill="#ffffff"/>'
+    }
+};
 window.coalertaEstadoUbicacionMapa = "pending";
 window.coalertaUbicacionMapa = null;
 
@@ -37,7 +65,7 @@ document.addEventListener("DOMContentLoaded", function () {
         return;
     }
 
-    window.map = L.map(elementoMapa, { zoomControl: true })
+    window.map = L.map(elementoMapa, { zoomControl: true, preferCanvas: true, maxZoom: 19 })
         .setView([-12.0990, -77.0360], 15);
     const query = new URLSearchParams(window.location.search);
     const latitudeValue = query.get("lat");
@@ -60,8 +88,6 @@ document.addEventListener("DOMContentLoaded", function () {
     window.grupoMarcadoresAlertas = L.layerGroup().addTo(window.map);
     window.marcadoresAlertas = [];
     const grupoMarcadoresSerenazgo = L.layerGroup().addTo(window.map);
-    const grupoMarcadoresLugares = L.layerGroup().addTo(window.map);
-
     const tileLayer = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}", {
         maxZoom: 19,
         attribution: "Tiles &copy; Esri — Source: Esri, HERE, Garmin, (c) OpenStreetMap contributors, and the GIS user community"
@@ -74,6 +100,15 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         console.warn("El proveedor de mapas no pudo cargar una imagen:", event.tile && event.tile.src);
     });
+    const grupoMarcadoresLugares = typeof L.markerClusterGroup === "function"
+        ? L.markerClusterGroup({
+            chunkedLoading: true,
+            chunkInterval: 100,
+            chunkDelay: 25,
+            removeOutsideVisibleBounds: true,
+            showCoverageOnHover: false
+        }).addTo(window.map)
+        : L.layerGroup().addTo(window.map);
 
     cargarAlertasGuardadas();
     mostrarLugaresCercanosEnMapa(grupoMarcadoresLugares, lugarObjetivo);
@@ -286,9 +321,8 @@ function leerLugaresGuardados() {
 function crearMarcadorLugar(lugar) {
     const tipo = TIPOS_LUGAR_MAPA[lugar.tipo] || TIPOS_LUGAR_MAPA.lugar;
     const marcador = L.marker([lugar.latitud, lugar.longitud], {
-        icon: crearIconoMapa(tipo.icono, tipo.color),
-        zIndexOffset: -100,
-        title: lugar.nombre
+        icon: obtenerIconoLugarMapa(lugar.tipo),
+        zIndexOffset: -100
     });
     const popup = document.createElement("div");
     popup.className = "popup-coalerta";
@@ -301,17 +335,19 @@ function crearMarcadorLugar(lugar) {
     return marcador;
 }
 
-// Dibuja los centros de salud y comisarías encontrados en "Mi comunidad" y,
-// si se llegó desde un enlace de esa página, abre el lugar seleccionado.
+// Dibuja los lugares cercanos guardados desde "Mi comunidad" y enfoca el
+// lugar seleccionado cuando se llega desde un enlace de esa página.
 function mostrarLugaresCercanosEnMapa(capa, lugarObjetivo) {
     if (!capa) return;
     capa.clearLayers();
     const margen = 0.0002; // ≈ 22 m
     let elegido = null;
     let menorDistancia = Infinity;
+    const marcadores = [];
 
     leerLugaresGuardados().forEach((lugar) => {
-        const marcador = crearMarcadorLugar(lugar).addTo(capa);
+        const marcador = crearMarcadorLugar(lugar);
+        marcadores.push(marcador);
         if (!lugarObjetivo) return;
         const dLat = Math.abs(lugar.latitud - lugarObjetivo.latitud);
         const dLng = Math.abs(lugar.longitud - lugarObjetivo.longitud);
@@ -332,9 +368,25 @@ function mostrarLugaresCercanosEnMapa(capa, lugarObjetivo) {
             tipo: TIPOS_LUGAR_MAPA[lugarObjetivo.tipo] ? lugarObjetivo.tipo : "lugar",
             latitud: lugarObjetivo.latitud,
             longitud: lugarObjetivo.longitud
-        }).addTo(capa);
+        });
+        marcadores.push(elegido);
     }
-    if (elegido) elegido.openPopup();
+    if (elegido) {
+        marcadores.splice(marcadores.indexOf(elegido), 1);
+        marcadores.unshift(elegido);
+    }
+    if (typeof capa.addLayers === "function") {
+        capa.addLayers(marcadores);
+    } else {
+        marcadores.forEach((marcador) => capa.addLayer(marcador));
+    }
+    if (!elegido) return;
+    if (typeof capa.zoomToShowLayer === "function") {
+        capa.zoomToShowLayer(elegido, () => elegido.openPopup());
+    } else {
+        window.map.setView(elegido.getLatLng(), 17);
+        elegido.openPopup();
+    }
 }
 
 function configurarPanelAlertasMovil() {
@@ -425,6 +477,22 @@ function crearIconoMapa(icono, color) {
         iconAnchor: [21, 42],
         popupAnchor: [0, -42]
     });
+}
+
+function obtenerIconoLugarMapa(tipo) {
+    const categoria = DATOS_ICONO_LUGAR_MAPA[tipo] ? tipo : "lugar";
+    if (ICONOS_LUGAR_MAPA.has(categoria)) return ICONOS_LUGAR_MAPA.get(categoria);
+
+    const { color, dibujo } = DATOS_ICONO_LUGAR_MAPA[categoria];
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 32 40"><path d="${SILUETA_PIN_LUGAR_MAPA}" fill="${color}" stroke="#ffffff" stroke-width="2.5" stroke-linejoin="round"/>${dibujo}</svg>`;
+    const icono = L.icon({
+        iconUrl: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
+        iconSize: [32, 40],
+        iconAnchor: [16, 40],
+        popupAnchor: [0, -36]
+    });
+    ICONOS_LUGAR_MAPA.set(categoria, icono);
+    return icono;
 }
 
 function agregarMarcadorAlerta(alerta) {

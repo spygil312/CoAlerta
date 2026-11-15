@@ -244,13 +244,19 @@ document.addEventListener("DOMContentLoaded", function () {
             if (payloadSize > 2048) throw new Error("El paquete de alerta supera el límite de 2 KB.");
             await window.coalertaData.waitForReady();
             const submitted = await window.coalertaData.createAlert(payload);
+            const reportedPrecisionMetros = Number.isFinite(submitted.precisionMetros)
+                ? submitted.precisionMetros
+                : precisionMetros;
             const submittedAlert = {
                 ...payload,
+                latitud: submitted.latitud ?? payload.latitud,
+                longitud: submitted.longitud ?? payload.longitud,
+                precisionMetros: reportedPrecisionMetros,
                 direccion: submitted.direccion || "",
                 id: submitted.incidentId,
                 estado: "Recibido en servidor",
                 prioridad: normalizedCategory === "sospecha" ? "Media" : "Alta",
-                reportes: 1,
+                reportes: submitted.reportes || 1,
                 timestamp: new Date().toISOString(),
                 uid: window.coalertaData.getProfile().uid,
                 esReporteReciente: true
@@ -258,9 +264,9 @@ document.addEventListener("DOMContentLoaded", function () {
             window.dispatchEvent(new CustomEvent("coalerta:alerta-reportada", {
                 detail: { alerta: submittedAlert }
             }));
-            const precisionTexto = precisionMetros >= 1000
-                ? `${(precisionMetros / 1000).toFixed(1)} km`
-                : `${Math.round(precisionMetros)} m`;
+            const precisionTexto = reportedPrecisionMetros >= 1000
+                ? `${(reportedPrecisionMetros / 1000).toFixed(1)} km`
+                : `${Math.round(reportedPrecisionMetros)} m`;
             showFeedback(
                 `Alerta recibida por la central. Ubicación aproximada (margen estimado ±${precisionTexto}).`,
                 "success",

@@ -600,12 +600,12 @@ document.addEventListener('DOMContentLoaded', () => {
         );
     }
 
-    // Deja los centros de salud y comisarías encontrados disponibles para el
-    // panel de mapa (pages/mapa.html), que los dibuja como marcadores.
+    // Deja todos los lugares cercanos disponibles para el panel de mapa
+    // (pages/mapa.html), que los dibuja como marcadores.
     // Solo se guardan en esta pestaña (sessionStorage), igual que la ubicación.
     function guardarLugaresParaMapa(lugares) {
         try {
-            const tiposEnMapa = ['salud', 'comisaria', 'serenazgo'];
+            const tiposEnMapa = ['salud', 'comisaria', 'serenazgo', 'bomberos', 'municipalidad'];
             const compactos = lugares
                 .filter((lugar) => tiposEnMapa.includes(lugar.tipo))
                 .map((lugar) => ({
@@ -683,13 +683,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function clasificarLugarCercano(etiquetas, nombre) {
+        if (etiquetas.tipo === 'bomberos' || etiquetas.categoria === 'bomberos' ||
+            etiquetas.amenity === 'fire_station' || etiquetas.emergency === 'fire_station' ||
+            /bombero|compa(?:ñ|n)[ií]a|fire/i.test(nombre)) return 'bomberos';
         if (/serenazgo|seguridad ciudadana/i.test(nombre)) return 'serenazgo';
         if (etiquetas.amenity === 'police' ||
             /comisar[ií]a|polic[ií]a|PNP/i.test(nombre)) return 'comisaria';
         if (etiquetas.amenity === 'townhall' || etiquetas.government === 'municipality' ||
             /municipalidad|municipio/i.test(nombre)) return 'municipalidad';
-        if (etiquetas.amenity === 'fire_station' || etiquetas.emergency === 'fire_station' ||
-            /bomberos|estaci[oó]n de bomberos/i.test(nombre)) return 'bomberos';
         if (['hospital', 'clinic', 'doctors'].includes(etiquetas.amenity) ||
             ['hospital', 'clinic', 'health_post', 'doctor'].includes(etiquetas.healthcare) ||
             /posta|centro de salud/i.test(nombre)) return 'salud';

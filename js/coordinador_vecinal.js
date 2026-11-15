@@ -19,6 +19,7 @@ document.addEventListener("DOMContentLoaded", function () {
     let map;
     let alertLayer;
     let patrolLayer;
+    let coordinatorLocationLayer;
     let zoneLayer;
     let routeLayer;
     let heatLayer;
@@ -26,6 +27,9 @@ document.addEventListener("DOMContentLoaded", function () {
     let watchId = null;
     let patrolLocationSyncTimer = null;
     let latestPatrolPoint = null;
+    let coordinatorLocation = null;
+    let coordinatorLocationRenderedAt = 0;
+    let patrolExpiryTimer = null;
     let patrolLocationSyncInProgress = false;
     let heatmapEnabled = false;
     let mapNightMode = false;
@@ -116,6 +120,9 @@ document.addEventListener("DOMContentLoaded", function () {
         activeRole = accountRole;
         initialized = true;
         zone = data.getZone();
+        document.getElementById("estadoPatrulla").textContent = isPatrolRole()
+            ? "La ubicación GPS de patrulla está desactivada."
+            : "La ubicación GPS de coordinación está desactivada.";
         updateSidebarProfile(data.getProfile());
         const roleLabel = document.getElementById("rolCentral");
         roleLabel.textContent = activeRole === "administrador" || activeRole === "admin"
@@ -169,6 +176,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }).addTo(map);
         alertLayer = L.layerGroup().addTo(map);
         patrolLayer = L.layerGroup().addTo(map);
+        coordinatorLocationLayer = L.layerGroup().addTo(map);
         zoneLayer = L.layerGroup().addTo(map);
         routeLayer = L.layerGroup().addTo(map);
         window.setTimeout(() => map && map.invalidateSize(), 250);
@@ -268,7 +276,7 @@ document.addEventListener("DOMContentLoaded", function () {
             .filter((alert) => !["Emergencia Concluida", "Descartada"].includes(alert.estado))
             .filter((alert) => selectedCategories.includes(data.normalizeCategory(alert.tipo)))
             .filter(matchesPeriod)
-            .filter(isInZone)
+            .filter((alert) => isCoordinatorRole() || isInZone(alert))
             .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
         incidentsList.replaceChildren();
         if (!filtered.length) {
@@ -447,7 +455,13 @@ document.addEventListener("DOMContentLoaded", function () {
             Number.isFinite(Number(patrol.latitud)) && Number.isFinite(Number(patrol.longitud))
         );
         let origin;
-        if (patrols.length) {
+        if (coordinatorLocation && !isPatrolRole()) {
+            origin = {
+                latitud: coordinatorLocation.latitud,
+                longitud: coordinatorLocation.longitud,
+                codigo: isCoordinatorRole() ? "Ubicación del coordinador" : "Tu ubicación"
+            };
+        } else if (patrols.length) {
             origin = patrols.reduce((closest, patrol) =>
                 data.distanceMeters(alert, patrol) < data.distanceMeters(alert, closest) ? patrol : closest
             );
@@ -460,7 +474,7 @@ document.addEventListener("DOMContentLoaded", function () {
                         codigo: "Tu ubicación"
                     }),
                     () => reject(new Error("No hay patrullas con ubicación y no se pudo obtener tu ubicación GPS.")),
-                    { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 }
+                    { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
                 );
             });
         } else {
@@ -729,6 +743,7 @@ document.addEventListener("DOMContentLoaded", function () {
     function togglePatrolLocation() {
         const status = document.getElementById("estadoPatrulla");
         if (watchId !== null) {
+            const patrolRole = isPatrolRole();
             navigator.geolocation.clearWatch(watchId);
             watchId = null;
             if (patrolLocationSyncTimer !== null) {
@@ -736,14 +751,24 @@ document.addEventListener("DOMContentLoaded", function () {
                 patrolLocationSyncTimer = null;
             }
             latestPatrolPoint = null;
-            status.textContent = "Ubicación GPS de patrulla detenida.";
+            coordinatorLocation = null;
+            coordinatorLocationRenderedAt = 0;
+            status.textContent = patrolRole
+                ? "Ubicación GPS de patrulla detenida."
+                : "Ubicación GPS de coordinación detenida.";
+            if (zone && map) {
+                map.setView([Number(zone.latitud), Number(zone.longitud)], map.getZoom(), { animate: false });
+            }
+            render();
             return;
         }
         if (!navigator.geolocation) {
             status.textContent = "Este navegador no permite geolocalización.";
             return;
         }
-        status.textContent = "Conectando el GPS de esta unidad con Firebase...";
+        status.textContent = isPatrolRole()
+            ? "Conectando el GPS de esta unidad con Firebase..."
+            : "Obteniendo ubicación GPS para el panel de coordinación...";
         watchId = navigator.geolocation.watchPosition((position) => {
             latestPatrolPoint = {
                 latitud: position.coords.latitude,
@@ -752,8 +777,11 @@ document.addEventListener("DOMContentLoaded", function () {
             };
             if (!patrolLocationSyncInProgress) void syncPatrolLocation();
         }, (error) => {
-            console.error("No se pudo obtener la ubicación de patrulla:", error);
-            status.textContent = "No se pudo obtener ubicación. Revisa el permiso del navegador e inténtalo otra vez.";
+            const locationOwner = isPatrolRole() ? "de patrulla" : "de coordinación";
+            console.error(`No se pudo obtener la ubicación ${locationOwner}:`, error);
+            status.textContent = isPatrolRole()
+                ? "No se pudo obtener ubicación de patrulla. Revisa el permiso del navegador e inténtalo otra vez."
+                : "No se pudo obtener ubicación de coordinación. Revisa el permiso del navegador e inténtalo otra vez.";
             if (watchId !== null) navigator.geolocation.clearWatch(watchId);
             watchId = null;
             if (patrolLocationSyncTimer !== null) {
@@ -761,6 +789,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 patrolLocationSyncTimer = null;
             }
             latestPatrolPoint = null;
+            coordinatorLocation = null;
+            coordinatorLocationRenderedAt = 0;
+            render();
         }, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
     }
 
@@ -768,13 +799,35 @@ document.addEventListener("DOMContentLoaded", function () {
         if (watchId === null || !latestPatrolPoint || patrolLocationSyncInProgress) return;
         patrolLocationSyncInProgress = true;
         try {
-            await data.updatePatrolLocation(latestPatrolPoint);
-            document.getElementById("estadoPatrulla").textContent =
-                `Ubicación de la unidad sincronizada ${new Date().toLocaleTimeString()}.`;
+            if (isPatrolRole()) {
+                await data.updatePatrolLocation(latestPatrolPoint);
+                document.getElementById("estadoPatrulla").textContent =
+                    `Ubicación de la unidad sincronizada ${new Date().toLocaleTimeString()}.`;
+            } else {
+                const centerMap = coordinatorLocation === null;
+                coordinatorLocation = { ...latestPatrolPoint };
+                if (centerMap && map) {
+                    map.setView(
+                        [coordinatorLocation.latitud, coordinatorLocation.longitud],
+                        Math.min(19, Math.max(14, map.getZoom())),
+                        { animate: false }
+                    );
+                }
+                document.getElementById("estadoPatrulla").textContent =
+                    `Ubicación GPS de coordinación actualizada ${new Date().toLocaleTimeString()}.`;
+                document.getElementById("estadoRutaCentral").textContent =
+                    "Mapa centrado en tu ubicación. Selecciona un incidente para consultar una ruta vial.";
+                const now = Date.now();
+                if (centerMap || now - coordinatorLocationRenderedAt >= 5000) {
+                    coordinatorLocationRenderedAt = now;
+                    render();
+                }
+            }
         } catch (error) {
-            console.error("No se pudo sincronizar la ubicación de patrulla:", error);
+            const locationOwner = isPatrolRole() ? "de patrulla" : "de coordinación";
+            console.error(`No se pudo sincronizar la ubicación ${locationOwner}:`, error);
             document.getElementById("estadoPatrulla").textContent =
-                error.message || "No se pudo sincronizar la ubicación de patrulla.";
+                error.message || `No se pudo sincronizar la ubicación ${locationOwner}.`;
             if (watchId !== null) navigator.geolocation.clearWatch(watchId);
             watchId = null;
             if (patrolLocationSyncTimer !== null) {
@@ -795,7 +848,7 @@ document.addEventListener("DOMContentLoaded", function () {
     function renderMap(alerts) {
         if (!map || !alertLayer) return;
         alertLayer.clearLayers();
-        alerts.filter((alert) => hasCoordinates(alert)).forEach((alert) => {
+        alerts.filter((alert) => data.isActive(alert) && hasCoordinates(alert)).forEach((alert) => {
             const marker = L.circleMarker([Number(alert.latitud), Number(alert.longitud)], {
                 radius: 8,
                 color: "#fff",
@@ -807,14 +860,13 @@ document.addEventListener("DOMContentLoaded", function () {
             marker.addTo(alertLayer);
         });
         drawPatrol(data.getPatrols());
+        drawCoordinatorLocation();
         drawZone();
         if (heatmapEnabled) updateHeatmap(alerts);
     }
 
     function renderPatrol() {
-        const patrols = data.getPatrols();
-        document.getElementById("totalUnidades").textContent = String(patrols.length);
-        drawPatrol(patrols);
+        drawPatrol(data.getPatrols());
     }
 
     function calculateEta(alert) {
@@ -824,8 +876,18 @@ document.addEventListener("DOMContentLoaded", function () {
     function drawPatrol(patrols = data.getPatrols()) {
         if (!map || !patrolLayer) return;
         patrolLayer.clearLayers();
-        patrols.filter((patrol) => Number.isFinite(Number(patrol.latitud)) &&
-            Number.isFinite(Number(patrol.longitud))).forEach((patrol) => {
+        if (patrolExpiryTimer !== null) {
+            window.clearTimeout(patrolExpiryTimer);
+            patrolExpiryTimer = null;
+        }
+        const now = Date.now();
+        const currentPatrols = patrols.filter((patrol) => {
+            const updatedAt = Date.parse(patrol.updatedAt || "");
+            return hasCoordinates(patrol) && Number.isFinite(updatedAt) &&
+                now - updatedAt >= -10000 && now - updatedAt <= 2 * 60 * 1000;
+        });
+        document.getElementById("totalUnidades").textContent = String(currentPatrols.length);
+        currentPatrols.forEach((patrol) => {
             const markerColor = ["Despachado", "En sitio"].includes(patrol.estado)
                 ? "#1676d2"
                 : ["Disponible", "Patrullando"].includes(patrol.estado)
@@ -840,6 +902,27 @@ document.addEventListener("DOMContentLoaded", function () {
             }).bindPopup(`${escapeHtml(patrol.codigo || patrol.id)} · ${escapeHtml(patrol.estado || "Disponible")}`)
                 .addTo(patrolLayer);
         });
+        if (currentPatrols.length) {
+            const nextExpiry = Math.min(...currentPatrols.map((patrol) =>
+                Date.parse(patrol.updatedAt) + 2 * 60 * 1000
+            ));
+            patrolExpiryTimer = window.setTimeout(
+                () => drawPatrol(data.getPatrols()),
+                Math.max(0, nextExpiry - Date.now() + 1)
+            );
+        }
+    }
+
+    function drawCoordinatorLocation() {
+        if (!coordinatorLocationLayer) return;
+        coordinatorLocationLayer.clearLayers();
+        if (!coordinatorLocation) return;
+        L.circleMarker(
+            [coordinatorLocation.latitud, coordinatorLocation.longitud],
+            { radius: 8, color: "#fff", weight: 2, fillColor: "#1769aa", fillOpacity: 1 }
+        ).bindPopup(isCoordinatorRole()
+            ? "Ubicación GPS del coordinador"
+            : "Tu ubicación GPS").addTo(coordinatorLocationLayer);
     }
 
     function drawZone() {
@@ -1015,8 +1098,31 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function isInZone(alert) {
-        if (!zone || !hasCoordinates(alert)) return false;
-        return data.distanceMeters(zone, alert) <= zone.radioMetros;
+        const filterZone = coordinatorLocation && isCoordinatorRole()
+            ? getCoordinatorLocationFilterZone()
+            : zone;
+        if (!filterZone || !hasCoordinates(alert)) return false;
+        return data.distanceMeters(filterZone, alert) <= filterZone.radioMetros;
+    }
+
+    function getCoordinatorLocationFilterZone() {
+        const configuredRadiusKm = Number(document.getElementById("radioZona").value);
+        const radiusMetros = Number(zone && zone.radioMetros) ||
+            (Number.isFinite(configuredRadiusKm) && configuredRadiusKm >= 0.1 &&
+                configuredRadiusKm <= 20 ? configuredRadiusKm * 1000 : 1000);
+        return { ...coordinatorLocation, radioMetros: radiusMetros };
+    }
+
+    function isCoordinatorRole(role = data.getRole() || activeRole) {
+        return ["coordinador", "coordinador_vecinal"].includes(
+            String(role || "").trim().toLowerCase()
+        );
+    }
+
+    function isPatrolRole(role = data.getRole() || activeRole) {
+        return ["agente", "seguridad"].includes(
+            String(role || "").trim().toLowerCase()
+        );
     }
 
     function toggleNightTheme() {
