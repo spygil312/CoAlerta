@@ -25,18 +25,14 @@
 
         <div class="legal-nota">
             Esta política explica los datos que la versión actual de CoAlerta solicita y cómo se usan sus funciones. Es
-            información transparente del prototipo, no una certificación de cumplimiento legal. Antes de una publicación
-            pública se debe identificar al responsable, definir plazos de conservación y completar los canales para
-            ejercer derechos.
+            información transparente del prototipo, no una certificación de cumplimiento legal.
         </div>
 
         <div class="legal-secciones">
             <section>
                 <h2>1. Responsable y alcance</h2>
-                <p>CoAlerta todavía no muestra en la aplicación la razón social o identidad del responsable del
-                    tratamiento, su domicilio ni un correo de privacidad. Por ello, esta página no puede identificar
-                    quién responde legalmente por los datos. Esa información y un canal de contacto deben añadirse antes
-                    de habilitar registros de público general.</p>
+                <p>CoAlerta es un prototipo universitario desarrollado con fines académicos y de evaluación; no es un
+                    servicio comercial ni una plataforma de producción.</p>
             </section>
 
             <section>
@@ -80,7 +76,7 @@
                 </ul>
                 <p>Antes de capturar la ubicación para un reporte, CoAlerta solicita marcar una casilla de consentimiento
                     explícito y obtener el permiso técnico del navegador. La ubicación se solicita cuando utilizas
-                    funciones que la requieren; CoAlerta no debe entenderse como un sistema de seguimiento continuo.</p>
+                    funciones que la requieren.</p>
             </section>
 
             <section>
@@ -88,9 +84,8 @@
                 <p>Los datos de perfil y el historial de reportes propios se restringen a la cuenta correspondiente y al
                     servidor. Las coordenadas exactas del incidente se restringen a personal operativo autorizado. Otros
                     usuarios autenticados pueden consultar los datos aproximados que se publican en el mapa.</p>
-                <p>La autenticación, base de datos y funciones de servidor utilizan Firebase de Google. La ubicación
-                    regional de la base de datos debe confirmarse en la configuración del proyecto; algunas funciones de
-                    servidor están configuradas en la región us-central1. Revisa las condiciones y prácticas de
+                <p>La autenticación y base de datos utilizan Firebase de Google. La ubicación regional de la base de
+                    datos debe confirmarse en la configuración del proyecto. Revisa las condiciones y prácticas de
                     Google/Firebase aplicables.</p>
                 <p>Los mapas base se sirven desde ArcGIS Online de Esri y pueden incorporar datos de Esri, HERE, Garmin
                     y OpenStreetMap. Al cargar el mapa, el navegador solicita imágenes de mosaicos a ese proveedor;
@@ -105,17 +100,23 @@
             </section>
 
             <section>
-                <h2>5. Conservación y desactivación</h2>
-                <p>El proyecto todavía no define un plazo concreto de conservación para perfiles, reportes, auditoría y
-                    demás registros de Firebase. La desactivación de una cuenta impide su uso y revoca sesiones, pero
-                    actualmente no elimina los datos asociados. Antes del lanzamiento público se debe establecer un
-                    calendario de conservación y un procedimiento de eliminación o anonimización.</p>
+                <h2>5. Conservación y eliminación de cuenta</h2>
+                <p>La persona usuaria puede eliminar su cuenta desde el perfil luego de confirmar su DNI y volver a
+                    autenticarse. Se borran el perfil, las credenciales de Firebase Authentication, los contactos,
+                    preferencias y registros privados. En los incidentes y registros comunitarios se retira el
+                    identificador de autoría; la información operativa, como ubicación, detalle, estado o acciones de
+                    auditoría, puede mantenerse sin ese identificador. Los anuncios conservados reemplazan el nombre
+                    por “Usuario eliminado”. Si una conexión falla durante el proceso, se puede reintentar la
+                    limpieza antes de cerrar definitivamente la sesión. La cuenta del único coordinador registrado
+                    de una comunidad no se elimina hasta que otra persona coordinadora inicie sesión.
+                    El proyecto todavía debe establecer plazos de conservación y someter este tratamiento a revisión
+                    legal antes de su lanzamiento público.</p>
             </section>
 
             <section>
                 <h2>6. Seguridad</h2>
-                <p>La aplicación utiliza reglas de acceso de Firestore y funciones de servidor para operaciones
-                    sensibles; la contraseña se gestiona a través de Firebase Authentication y no se almacena como texto
+                <p>La aplicación utiliza reglas de acceso de Firestore para proteger sus datos; la contraseña se
+                    gestiona a través de Firebase Authentication y no se almacena como texto
                     legible en Firestore. Ningún sistema conectado a Internet puede garantizar seguridad absoluta. No
                     compartas tu contraseña.</p>
             </section>
@@ -123,9 +124,7 @@
             <section>
                 <h2>7. Tus opciones y derechos</h2>
                 <p>Puedes decidir si otorgas permisos de ubicación y puedes cambiar preferencias desde la aplicación. La
-                    ley aplicable puede reconocer derechos de acceso, rectificación, cancelación, oposición u otros.
-                    Como todavía no hay un responsable ni canal de privacidad publicado, esta versión no ofrece un medio
-                    operativo para recibir y responder solicitudes; debe habilitarse antes del uso público.</p>
+                    ley aplicable puede reconocer derechos de acceso, rectificación, cancelación, oposición u otros.</p>
             </section>
 
             <section>

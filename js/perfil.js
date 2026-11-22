@@ -1,6 +1,7 @@
 import {
     EmailAuthProvider, GoogleAuthProvider, onAuthStateChanged, reauthenticateWithCredential,
-    reauthenticateWithPopup, sendEmailVerification, signOut, updateEmail, updateProfile, updatePassword
+    reauthenticateWithPopup, sendEmailVerification, signOut, updateEmail, updateProfile, updatePassword,
+    deleteUser
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
@@ -60,7 +61,7 @@ document.addEventListener("DOMContentLoaded", function () {
         formContactos.addEventListener("submit", guardarContactosEmergencia);
     }
     if (formDesactivarCuenta) {
-        formDesactivarCuenta.addEventListener("submit", desactivarCuenta);
+        formDesactivarCuenta.addEventListener("submit", eliminarCuenta);
     }
 
     ["contacto1Telefono", "contacto2Telefono", "dniDesactivacion"].forEach((id) => {
@@ -169,10 +170,6 @@ document.addEventListener("DOMContentLoaded", function () {
         establecerTexto("estadoSolicitudRol", solicitud);
         establecerRol(rol);
         mostrarContactosEmergencia(usuario.contactosEmergencia);
-        establecerTexto(
-            "preguntaSeguridadActual",
-            "El acceso a la cuenta se valida con Firebase usando tu correo y contraseña."
-        );
         establecerValor("dniDesactivacion", usuario.dni || "");
 
         const imagen = usuario.fotoBase64 || usuario.fotoURL || usuario.photoURL;
@@ -467,7 +464,7 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         }
         const usuarioAuth = typeof auth !== "undefined" ? auth.currentUser : null;
-        if (!usuarioAuth || !window.coalertaData || !window.coalertaData.isReady()) {
+        if (!usuarioAuth || !window.coalertaData) {
             mostrarMensaje(mensajeContactos, "Inicia sesión y espera la conexión con Firebase para guardar los contactos.", "error");
             return;
         }
@@ -488,33 +485,64 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
-    async function desactivarCuenta(evento) {
+    async function eliminarCuenta(evento) {
         evento.preventDefault();
         limpiarMensaje(mensajeDesactivacion);
         const dni = document.getElementById("dniDesactivacion").value.trim();
         const usuarioAuth = typeof auth !== "undefined" ? auth.currentUser : null;
         if (!/^\d{8}$/.test(dni)) {
-            mostrarMensaje(mensajeDesactivacion, "Ingresa un DNI válido de 8 dígitos para confirmar la desactivación.", "error");
+            mostrarMensaje(mensajeDesactivacion, "Ingresa un DNI válido de 8 dígitos para confirmar la eliminación.", "error");
             return;
         }
-        if (!usuarioAuth || !window.coalertaData || !window.coalertaData.isReady()) {
-            mostrarMensaje(mensajeDesactivacion, "Inicia sesión y espera la conexión con Firebase para desactivar la cuenta.", "error");
+        if (!usuarioAuth || !window.coalertaData) {
+            mostrarMensaje(mensajeDesactivacion, "Inicia sesión y espera la conexión con Firebase para eliminar la cuenta.", "error");
             return;
         }
-        if (!window.confirm("¿Confirmas la desactivación de esta cuenta? La operación cerrará esta sesión.")) return;
+        if (!window.confirm(
+            "¿Eliminar definitivamente tu cuenta? Se borrarán tus datos personales y se anonimizará tu autoría en los registros compartidos. Esta acción no se puede deshacer."
+        )) return;
         establecerCargando(formDesactivarCuenta, true);
+        let datosEliminados = false;
         try {
-            await window.coalertaData.deactivateAccount(dni);
+            await reautenticarParaEliminarCuenta(usuarioAuth);
+            await window.coalertaData.deleteAccount(dni);
+            datosEliminados = true;
             localStorage.removeItem("coalerta_usuario");
             localStorage.removeItem("coalertaSesion");
-            await signOut(auth);
+            localStorage.removeItem("userRole");
+            localStorage.removeItem("coalerta_ubicacion_sesion");
+            localStorage.removeItem(`coalertaPreferencias:${usuarioAuth.uid}`);
+            localStorage.removeItem(`coalertaPreferenciasPendientes:${usuarioAuth.uid}`);
+            await deleteUser(usuarioAuth);
             window.location.replace("login.html");
         } catch (error) {
-            console.error("No se pudo desactivar la cuenta:", error);
-            mostrarMensaje(mensajeDesactivacion, error.message || "No se pudo desactivar la cuenta.", "error");
+            console.error("No se pudo eliminar la cuenta:", error);
+            const mensaje = datosEliminados
+                ? "Tus datos de CoAlerta ya se eliminaron, pero Firebase Authentication no pudo cerrar la cuenta. Vuelve a autenticarte e inténtalo nuevamente."
+                : error.message || "No se pudo eliminar la cuenta. No cierres esta sesión y vuelve a intentarlo.";
+            mostrarMensaje(mensajeDesactivacion, mensaje, "error");
         } finally {
             establecerCargando(formDesactivarCuenta, false);
         }
+    }
+
+    async function reautenticarParaEliminarCuenta(usuarioAuth) {
+        const proveedores = (usuarioAuth.providerData || []).map((proveedor) => proveedor.providerId);
+        if (proveedores.includes("password")) {
+            const contrasena = window.prompt("Por seguridad, ingresa tu contraseña actual para eliminar la cuenta.");
+            if (contrasena === null) throw new Error("Eliminación cancelada.");
+            if (!contrasena) throw new Error("Debes ingresar tu contraseña actual.");
+            await reauthenticateWithCredential(
+                usuarioAuth,
+                EmailAuthProvider.credential(usuarioAuth.email, contrasena)
+            );
+            return;
+        }
+        if (proveedores.includes("google.com")) {
+            await reauthenticateWithPopup(usuarioAuth, new GoogleAuthProvider());
+            return;
+        }
+        throw new Error("Tu proveedor de inicio de sesión no permite verificar la identidad desde esta página.");
     }
 
     async function reautenticarParaCambioCorreo(usuarioAuth) {

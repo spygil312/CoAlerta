@@ -1,7 +1,7 @@
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import {
     collection, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query,
-    runTransaction, serverTimestamp, Timestamp, updateDoc, where
+    runTransaction, serverTimestamp, Timestamp, where
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
 
@@ -64,7 +64,36 @@ if (aviso && panel && lista && cantidad && botonActualizar) {
                 throw new Error("La cuenta autorizada no tiene un perfil activo en Firestore.");
             }
             if (profileSnapshot.get("rol") === "coordinador") {
-                await updateDoc(profileRef, { rol: "administrador" });
+                const communityId = String(profileSnapshot.get("comunidadId") || "").trim();
+                const communityRef = communityId
+                    ? doc(db, "comunidades", communityId)
+                    : null;
+                await runTransaction(db, async (transaction) => {
+                    const currentProfile = await transaction.get(profileRef);
+                    const communitySnapshot = communityRef
+                        ? await transaction.get(communityRef)
+                        : null;
+                    if (!currentProfile.exists() || currentProfile.get("rol") !== "coordinador") {
+                        throw new Error("El perfil coordinador cambió. Actualiza la página e inténtalo nuevamente.");
+                    }
+                    transaction.update(profileRef, { rol: "administrador" });
+                    if (communityRef && communitySnapshot && communitySnapshot.exists()) {
+                        const currentCoordinator = communitySnapshot.get("coordinadorUid");
+                        const currentAlternate = communitySnapshot.get("coordinadorAlternoUid");
+                        if (currentCoordinator === user.uid) {
+                            transaction.update(communityRef, {
+                                coordinadorUid: currentAlternate || null,
+                                coordinadorAlternoUid: null,
+                                updatedAt: serverTimestamp()
+                            });
+                        } else if (currentAlternate === user.uid) {
+                            transaction.update(communityRef, {
+                                coordinadorAlternoUid: null,
+                                updatedAt: serverTimestamp()
+                            });
+                        }
+                    }
+                });
             } else if (!["administrador", "admin"].includes(profileSnapshot.get("rol"))) {
                 throw new Error(
                     `La cuenta autorizada debe tener el rol coordinador o administrador. ` +

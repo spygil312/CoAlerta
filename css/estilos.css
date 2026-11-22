@@ -367,9 +367,7 @@ img { max-width: 100%; display: block; }
 .btn-principal:hover, .btn-cta:hover { background: var(--verde-oscuro); }
 .btn-secundario { border: 1px solid var(--borde); background: var(--blanco); }
 
-/* =====================================================
-   SECCIONES GENERALES
-=================================================== */
+/* SECCIONES GENERALES */
 .beneficios, .como-funciona, .seguridad {
     padding: 90px 0;
 }

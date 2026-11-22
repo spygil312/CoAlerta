@@ -6,9 +6,7 @@ import {
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
 
-/* =========================================================
-   COALERTA - SERVICIOS FIREBASE
-========================================================= */
+/* SERVICIOS FIREBASE */
 (function () {
     const DEFAULT_COMMUNITY_ID = "comunidad_general_1";
     const activeStates = new Set([
@@ -407,6 +405,11 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
             state.profile = { ...profile, uid: user.uid };
             state.role = String(profile.rol || "vecino").trim().toLowerCase();
             state.profile.rol = state.role;
+            if (state.role === "coordinador" && profile.comunidadId) {
+                registerCommunityCoordinator(user.uid, profile.comunidadId).catch((error) => {
+                    console.error("No se pudo registrar la coordinación comunitaria:", error);
+                });
+            }
             updateRoleNavigation(user, state.role, true);
             syncPreferences(user.uid, profile).catch((error) =>
                 reportListenerError("preferencias de cuenta", error)
@@ -583,6 +586,36 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
             }
         }
         if (document.body) document.body.dataset.roleNavigationReady = String(ready);
+    }
+
+    async function registerCommunityCoordinator(uid, communityId) {
+        const communityRef = doc(db, "comunidades", communityId);
+        await runTransaction(db, async (transaction) => {
+            const snapshot = await transaction.get(communityRef);
+            const timestamp = serverTimestamp();
+            if (!snapshot.exists()) {
+                transaction.set(communityRef, {
+                    coordinadorUid: uid,
+                    coordinadorAlternoUid: null,
+                    updatedAt: timestamp
+                });
+                return;
+            }
+            const currentCoordinator = snapshot.get("coordinadorUid");
+            const currentAlternate = snapshot.get("coordinadorAlternoUid");
+            if (!currentCoordinator) {
+                transaction.update(communityRef, {
+                    coordinadorUid: uid,
+                    coordinadorAlternoUid: null,
+                    updatedAt: timestamp
+                });
+            } else if (currentCoordinator !== uid && !currentAlternate) {
+                transaction.update(communityRef, {
+                    coordinadorAlternoUid: uid,
+                    updatedAt: timestamp
+                });
+            }
+        });
     }
 
     function requireActiveProfile() {
@@ -1987,20 +2020,246 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
         return contacts;
     }
 
-    async function deactivateAccount(dni) {
-        const { user, profile } = requireActiveProfile();
+    async function deleteAccount(dni) {
+        const user = auth.currentUser;
+        if (!user) throw new Error("Inicia sesión con la cuenta que deseas eliminar.");
+        const profileRef = doc(db, "usuarios", user.uid);
+        const profileSnapshot = await getDoc(profileRef);
+        if (!profileSnapshot.exists()) return { ok: true, profileAlreadyDeleted: true };
+        const profile = profileSnapshot.data();
+        if (profile.activo !== true) throw new Error("La cuenta no está activa.");
+        if (!["vecino", "coordinador", "seguridad", "agente"].includes(profile.rol)) {
+            throw new Error("Este tipo de cuenta no puede eliminarse desde el perfil.");
+        }
+        if (profile.patrullaId) {
+            throw new Error(
+                "Antes de eliminar esta cuenta, solicita al administrador que retire la unidad asignada."
+            );
+        }
         const value = String(dni || "").trim();
         if (!/^\d{8}$/.test(value)) throw new TypeError("Ingresa un DNI válido de 8 dígitos.");
         if (String(profile.dni || "").trim() !== value) {
-            throw new Error("El DNI no coincide con la cuenta activa. No se desactivó la cuenta.");
+            throw new Error("El DNI no coincide con la cuenta activa. No se eliminó la cuenta.");
         }
-        await updateDoc(doc(db, "usuarios", user.uid), {
-            activo: false,
-            desactivadoAt: serverTimestamp()
+
+        let communityId = String(profile.comunidadId || "").trim();
+        if (profile.rol === "coordinador" && !communityId) {
+            communityId = await ensureCoordinatorCommunity(user, profile);
+        }
+        const communityRef = profile.rol === "coordinador" && communityId
+            ? doc(db, "comunidades", communityId)
+            : null;
+        if (profile.rol === "coordinador" && communityId) {
+            await registerCommunityCoordinator(user.uid, communityId);
+            const communitySnapshot = await getDoc(communityRef);
+            const successorUid = communitySnapshot.get("coordinadorUid") === user.uid
+                ? communitySnapshot.get("coordinadorAlternoUid")
+                : communitySnapshot.get("coordinadorUid");
+            if (!successorUid || successorUid === user.uid) {
+                throw new Error(
+                    "No puedes eliminar la cuenta porque eres el único coordinador registrado. " +
+                    "Pide al administrador que habilite a otro coordinador y que esa persona inicie sesión antes de continuar."
+                );
+            }
+        }
+
+        if (communityId) {
+            const memberRef = doc(db, "comunidades", communityId, "miembros", user.uid);
+            const contactsRef = doc(db, "comunidades", communityId, "contactos_emergencia", user.uid);
+            const [memberSnapshot, contactsSnapshot] = await Promise.all([
+                getDoc(memberRef),
+                getDoc(contactsRef)
+            ]);
+            if (memberSnapshot.exists()) await deleteDoc(memberRef);
+            if (contactsSnapshot.exists()) await deleteDoc(contactsRef);
+
+            const announcements = await getDocs(query(
+                collection(db, "comunidades", communityId, "anuncios"),
+                where("autorUid", "==", user.uid)
+            ));
+            for (const announcement of announcements.docs) {
+                await updateDoc(announcement.ref, {
+                    autorUid: null,
+                    autorNombre: "Usuario eliminado"
+                });
+            }
+
+            const zoneRef = doc(db, "zonas", communityId);
+            const zoneSnapshot = await getDoc(zoneRef);
+            if (zoneSnapshot.exists() && zoneSnapshot.get("updatedBy") === user.uid) {
+                await updateDoc(zoneRef, {
+                    updatedBy: null,
+                    updatedAt: serverTimestamp()
+                });
+            }
+
+            const delegationRef = doc(db, "delegaciones", communityId);
+            const delegationSnapshot = await getDoc(delegationRef);
+            if (delegationSnapshot.exists()) {
+                if (delegationSnapshot.get("coordinadorUid") === user.uid) {
+                    await deleteDoc(delegationRef);
+                } else if (delegationSnapshot.get("suplenteUid") === user.uid) {
+                    await updateDoc(delegationRef, { suplenteUid: null });
+                }
+            }
+
+            const notices = await getDocs(query(
+                collection(db, "avisos_publicos"),
+                where("comunidadId", "==", communityId),
+                where("autorUid", "==", user.uid)
+            ));
+            for (const notice of notices.docs) {
+                await updateDoc(notice.ref, { autorUid: null });
+            }
+
+            const auditLogs = await getDocs(query(
+                collection(db, "logs"),
+                where("comunidadId", "==", communityId),
+                where("operadorId", "==", user.uid)
+            ));
+            for (const log of auditLogs.docs) {
+                await updateDoc(log.ref, { operadorId: null });
+            }
+
+            if (["seguridad", "agente"].includes(profile.rol)) {
+                const patrols = await getDocs(query(
+                    collection(db, "patrullas"),
+                    where("comunidadId", "==", communityId),
+                    where("agenteUid", "==", user.uid)
+                ));
+                for (const patrol of patrols.docs) {
+                    await updateDoc(patrol.ref, {
+                        agenteUid: null,
+                        latitud: null,
+                        longitud: null,
+                        precisionMetros: null,
+                        updatedAt: serverTimestamp()
+                    });
+                }
+            }
+        }
+
+        const reportedIncidents = await getDocs(query(
+            collection(db, "incidentes"),
+            where("reporterUids", "array-contains", user.uid)
+        ));
+        const resolvedIncidents = await getDocs(query(
+            collection(db, "incidentes"),
+            where("resueltoPorUid", "==", user.uid)
+        ));
+        const incidents = new Map();
+        [...reportedIncidents.docs, ...resolvedIncidents.docs].forEach((incident) => {
+            incidents.set(incident.id, incident);
         });
-        state.profile = { ...profile, activo: false };
+        for (const incident of incidents.values()) {
+            await deleteDoc(doc(db, "incidentes", incident.id, "calificaciones", user.uid));
+            await runTransaction(db, async (transaction) => {
+                const currentSnapshot = await transaction.get(incident.ref);
+                if (!currentSnapshot.exists()) return;
+                const current = currentSnapshot.data();
+                const reporters = current.reporterUids;
+                const changes = {};
+                if (Array.isArray(reporters) && reporters.includes(user.uid)) {
+                    changes.reporterUids = reporters.filter((uid) => uid !== user.uid);
+                    changes.ultimaAgrupacionUid = current.ultimaAgrupacionUid === user.uid
+                        ? null
+                        : current.ultimaAgrupacionUid || null;
+                }
+                if (current.resueltoPorUid === user.uid) changes.resueltoPorUid = null;
+                if (Object.keys(changes).length) transaction.update(incident.ref, changes);
+            });
+        }
+
+        const ownAlerts = await getDocs(query(
+            collection(db, "alertas"),
+            where("creadorId", "==", user.uid)
+        ));
+        for (const alert of ownAlerts.docs) {
+            await updateDoc(alert.ref, { creadorId: null });
+        }
+
+        const createdInvitations = await getDocs(query(
+            collection(db, "invitaciones"),
+            where("creadoPor", "==", user.uid)
+        ));
+        const usedInvitations = await getDocs(query(
+            collection(db, "invitaciones"),
+            where("usadoPor", "==", user.uid)
+        ));
+        const invitations = new Map();
+        [...createdInvitations.docs, ...usedInvitations.docs].forEach((invitation) => {
+            invitations.set(invitation.id, invitation);
+        });
+        for (const invitation of invitations.values()) {
+            const changes = {};
+            if (invitation.get("creadoPor") === user.uid) {
+                changes.creadoPor = null;
+                changes.activo = false;
+            }
+            if (invitation.get("usadoPor") === user.uid) changes.usadoPor = null;
+            if (Object.keys(changes).length) await updateDoc(invitation.ref, changes);
+        }
+
+        const outgoingMessages = await getDocs(query(
+            collection(db, "mensajes_salientes"),
+            where("usuarioId", "==", user.uid)
+        ));
+        await deleteAccountDocuments(outgoingMessages.docs);
+
+        const userCollections = ["alertas", "alertas_leidas", "avisos_leidos"];
+        for (const collectionName of userCollections) {
+            const documents = await getDocs(collection(profileRef, collectionName));
+            await deleteAccountDocuments(documents.docs);
+        }
+        await deleteDoc(doc(db, "usuarios", user.uid, "limites", "reportes_emergencia"));
+        await deleteDoc(doc(db, "limites_alertas_abiertas", user.uid));
+        const dniRef = profile.dni ? doc(db, "dni_index", String(profile.dni)) : null;
+        await runTransaction(db, async (transaction) => {
+            const currentProfile = await transaction.get(profileRef);
+            const communitySnapshot = communityRef
+                ? await transaction.get(communityRef)
+                : null;
+            const dniSnapshot = dniRef ? await transaction.get(dniRef) : null;
+            if (!currentProfile.exists()) return;
+            if (currentProfile.get("activo") !== true) {
+                throw new Error("La cuenta ya no está activa y no se puede eliminar desde esta sesión.");
+            }
+            if (communityRef && communitySnapshot && communitySnapshot.exists()) {
+                const currentCoordinator = communitySnapshot.get("coordinadorUid");
+                const currentAlternate = communitySnapshot.get("coordinadorAlternoUid");
+                if (currentCoordinator === user.uid) {
+                    if (!currentAlternate || currentAlternate === user.uid) {
+                        throw new Error("La comunidad necesita otro coordinador antes de eliminar esta cuenta.");
+                    }
+                    transaction.update(communityRef, {
+                        coordinadorUid: currentAlternate,
+                        coordinadorAlternoUid: null,
+                        updatedAt: serverTimestamp()
+                    });
+                } else if (currentAlternate === user.uid) {
+                    transaction.update(communityRef, {
+                        coordinadorAlternoUid: null,
+                        updatedAt: serverTimestamp()
+                    });
+                }
+            }
+            if (dniRef && dniSnapshot && dniSnapshot.exists()) transaction.delete(dniRef);
+            transaction.delete(profileRef);
+        });
         state.ready = false;
-        return { ok: true };
+        state.profile = null;
+        return { ok: true, profileAlreadyDeleted: false };
+    }
+
+    async function deleteAccountDocuments(documents) {
+        const batchSize = 400;
+        for (let index = 0; index < documents.length; index += batchSize) {
+            const batch = writeBatch(db);
+            documents.slice(index, index + batchSize).forEach((document) => {
+                batch.delete(document.ref);
+            });
+            await batch.commit();
+        }
     }
 
     window.coalertaData = {
@@ -2049,7 +2308,7 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
         listCommunityDelegates,
         saveEmergencyContacts,
         getCommunityMemberEmergencyContacts,
-        deactivateAccount
+        deleteAccount
     };
 
     const cachedProfile = (() => {

@@ -291,13 +291,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // ---------------------------------------------------------------------
-    // Búsqueda de lugares cercanos (comisarías, salud, bomberos, municipalidad)
-    // Orden de intentos:
-    //   1) Overpass (varios espejos, escalonados, por POST)
-    //   2) Caché antigua de la misma zona (si existe)
-    //   3) Nominatim (búsqueda por categoría, una consulta por segundo)
-    // ---------------------------------------------------------------------
     const RADIO_BUSQUEDA_METROS = 3000;
     const VIGENCIA_CACHE_MS = 30 * 60 * 1000;
     const TIEMPO_MAXIMO_OVERPASS_MS = 20000;
@@ -326,9 +319,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // fetch + comprobación de estado + lectura del JSON, todo dentro del mismo
-    // límite de tiempo. El motivo del aborto queda en el mensaje del error
-    // ("Tiempo de espera agotado") en vez de "signal is aborted without reason".
     async function pedirJson(url, opciones = {}, tiempoMaximoMs = 15000, senalExterna = null) {
         const controlador = new AbortController();
         const cancelar = () => controlador.abort(senalExterna && senalExterna.reason);
@@ -350,10 +340,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function construirConsultaOverpass(latitud, longitud, radio) {
-        // "nwr" = nodos + vías + relaciones. Muchas comisarías y hospitales están
-        // dibujados como edificios (vías), por eso antes no aparecían.
-        // Se usan filtros exactos (="valor") y no expresiones regulares (~), que
-        // son bastante más lentas y hacían que Overpass se pasara del tiempo.
         const alrededor = `(around:${radio},${latitud},${longitud})`;
         const filtros = [
             '["amenity"="police"]',
@@ -380,7 +366,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function guardarCacheLugares(clave, elements) {
-        if (!Array.isArray(elements) || elements.length === 0) return; // no guardar resultados vacíos
+        if (!Array.isArray(elements) || elements.length === 0) return;
         try {
             sessionStorage.setItem(clave, JSON.stringify({ timestamp: Date.now(), elements }));
         } catch (error) {
@@ -388,9 +374,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Lanza los espejos de Overpass de forma escalonada: el primero arranca de
-    // inmediato, el segundo 1,5 s después si el primero aún no respondió, etc.
-    // El primero que devuelve datos válidos gana y cancela a los demás.
     async function consultarOverpass(latitud, longitud) {
         const consulta = construirConsultaOverpass(latitud, longitud, RADIO_BUSQUEDA_METROS);
         const grupo = new AbortController();
@@ -410,14 +393,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!Array.isArray(datos.elements)) {
                     throw new Error(`${servidor} no devolvió una lista de lugares.`);
                 }
-                // Overpass sobrecargado a veces responde 200 con el aviso en "remark".
                 if (typeof datos.remark === 'string' && /runtime error|timed out|out of memory/i.test(datos.remark)) {
                     throw new Error(`${servidor}: ${datos.remark}`);
                 }
                 return datos.elements;
             }));
         } catch (error) {
-            // Promise.any lanza un AggregateError; se registra el motivo de cada espejo.
             if (error instanceof AggregateError) {
                 error.errors.forEach((motivo, indice) =>
                     console.warn(`Overpass (${SERVIDORES_OVERPASS[indice]}) falló:`, motivo && motivo.message || motivo)
@@ -425,12 +406,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             throw error;
         } finally {
-            grupo.abort(new DOMException('Consulta finalizada', 'AbortError')); // cancela los espejos que sigan en curso
+            grupo.abort(new DOMException('Consulta finalizada', 'AbortError'));
         }
     }
 
-    // Respaldo: Nominatim con búsqueda por categoría dentro de un recuadro (viewbox).
-    // Su política de uso pide como máximo 1 solicitud por segundo, por eso es secuencial.
     async function consultarNominatimPorCategoria(latitud, longitud) {
         const deltaLatitud = RADIO_BUSQUEDA_METROS / 111320;
         const deltaLongitud = RADIO_BUSQUEDA_METROS / (111320 * Math.max(0.1, Math.cos(latitud * Math.PI / 180)));
@@ -600,9 +579,6 @@ document.addEventListener('DOMContentLoaded', () => {
         );
     }
 
-    // Deja todos los lugares cercanos disponibles para el panel de mapa
-    // (pages/mapa.html), que los dibuja como marcadores.
-    // Solo se guardan en esta pestaña (sessionStorage), igual que la ubicación.
     function guardarLugaresParaMapa(lugares) {
         try {
             const tiposEnMapa = ['salud', 'comisaria', 'serenazgo', 'bomberos', 'municipalidad'];

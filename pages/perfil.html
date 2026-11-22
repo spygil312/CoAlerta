@@ -363,16 +363,16 @@
                     <section class="perfil-card">
                         <div class="perfil-card-header">
                             <div>
-                                <h2>Desactivación por robo o extravío</h2>
-                                <p>Verifica tu identidad para marcar la cuenta como inactiva.</p>
+                                <h2>Eliminar cuenta</h2>
+                                <p>Elimina definitivamente tu perfil y tus datos personales de CoAlerta.</p>
                             </div>
                             <div class="perfil-card-icono">
                                 <i class="fa-solid fa-mobile-screen-button" aria-hidden="true"></i>
                             </div>
                         </div>
                         <form class="perfil-formulario" id="formDesactivarCuenta">
-                            <p id="preguntaSeguridadActual" class="campo-ayuda">Confirma tu identidad ingresando el DNI
-                                asociado a esta cuenta.</p>
+                            <p class="campo-ayuda">Confirma tu identidad ingresando el DNI asociado y tu contraseña
+                                actual o autorizando nuevamente el acceso con Google.</p>
                             <div class="perfil-form-grid">
                                 <div class="grupo-formulario">
                                     <label for="dniDesactivacion">DNI del titular</label>
@@ -383,12 +383,16 @@
                                     </div>
                                 </div>
                             </div>
-                            <p class="campo-ayuda">Esta acción desactiva la cuenta y cierra la sesión actual. Se
-                                requiere confirmar el DNI asociado para continuar.</p>
+                            <p class="campo-ayuda">Se borrarán los datos de tu perfil y los registros que te pertenecen.
+                                Los incidentes compartidos conservarán la información operativa necesaria, pero sin
+                                identificarte como reportante o autor. La eliminación es irreversible. Si tienes una
+                                unidad de seguridad asignada, solicita al administrador que la retire primero. Si eres
+                                el único coordinador registrado de tu comunidad, otro coordinador debe iniciar sesión
+                                antes de que puedas eliminar tu cuenta.</p>
                             <div class="mensaje-perfil" id="mensajeDesactivacion" aria-live="polite"></div>
                             <div class="perfil-form-acciones">
                                 <button type="submit" class="btn-cambiar-password">
-                                    <i class="fa-solid fa-ban" aria-hidden="true"></i> Desactivar cuenta
+                                    <i class="fa-solid fa-trash" aria-hidden="true"></i> Eliminar mi cuenta
                                 </button>
                             </div>
                         </form>
@@ -430,8 +434,7 @@
                                     <div>
                                         <strong id="preferenciaSonidoLabel">Sonido de emergencia</strong>
                                         <span id="preferenciaSonidoAyuda">Activa o silencia el tono de alertas y avisos,
-                                            independientemente de mostrarlos. El navegador puede requerir una interacción
-                                            para habilitar el audio.</span>
+                                            independientemente de mostrarlos.</span>
                                     </div>
                                 </div>
                                 <label class="switch">
@@ -548,10 +551,10 @@
     </nav>
 
     <script type="module" src="../js/estado-cuenta.js?v=modular-sdk-1"></script>
-    <script type="module" src="../js/coalerta-data.js?v=incident-community-sync-read-throttle-20261114"></script>
+    <script type="module" src="../js/coalerta-data.js?v=account-deletion-rules-20261121"></script>
     <script src="../js/ubicacion.js?v=shared-distance-utils-20261111"></script>
     <script src="../js/notificaciones.js?v=alerts-sound-independent-20261112"></script>
-    <script type="module" src="../js/perfil.js?v=profile-role-inline-20261112"></script>
+    <script type="module" src="../js/perfil.js?v=account-deletion-auth-20261121"></script>
 </body>
 
 </html>

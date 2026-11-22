@@ -29,6 +29,7 @@ El proyecto se encuentra desplegado y accesible para el público a través de Gi
 ### 🔐 Autenticación y Seguridad
 - Inicio de sesión dual (Google Sign-In y Correo/Contraseña) con vinculación automática de cuentas (Account Linking).
 - Acceso rápido para emergencias mediante **Firebase Anonymous Authentication**.
+- Eliminación de cuenta iniciada por el titular, con limpieza y anonimización de referencias mediante reglas de Firestore.
 - Reglas de seguridad quirúrgicas (Firestore Rules) para evitar spam, modificaciones no autorizadas y proteger la privacidad de cada comunidad.
 
 ---
@@ -43,24 +44,9 @@ El proyecto se encuentra desplegado y accesible para el público a través de Gi
 
 ---
 
-## ⚙️ Instalación y Uso Local
-Al ser un proyecto desarrollado con tecnologías web estándar (sin frameworks complejos), su ejecución local es muy sencilla:
-
-1. **Clonar el repositorio:**
-   ```bash
-   git clone [https://github.com/spygil312/CoAlerta.git](https://github.com/spygil312/CoAlerta.git)
-
-1. **Abrir el proyecto:** Abre la carpeta del proyecto en tu editor de código preferido (ej. Visual Studio Code).
-2. **Configurar Firebase:** Asegúrate de que el archivo firebase-config.js contenga las credenciales de tu proyecto de Firebase.
-3. **Ejecutar servidor local:** Usa la extensión Live Server en VS Code (o cualquier servidor HTTP local) para abrir el archivo index.html.(Nota: Para que el inicio de sesión con Google funcione localmente, asegúrate de que el puerto y localhost estén en los dominios autorizados de tu consola de Firebase).
-
----
-
 ## 👨‍💻 Créditos
 Este proyecto es de código abierto y fue desarrollado por:
 Giliam de la Rosa Toro
 
 ## 📄 Licencia
 Este proyecto es de Código Abierto (Open Source). Está disponible de forma libre y gratuita para cualquier persona que tenga el enlace al repositorio, permitiendo su uso, estudio y modificación comunitaria.
-
-   

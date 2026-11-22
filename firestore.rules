@@ -935,11 +935,258 @@ service cloud.firestore {
     function validAccountDeactivation(uid) {
       return self(uid)
         && activeUser()
+        && resource.data.get('rol', 'vecino') != 'coordinador'
         && resource.data.activo == true
         && request.resource.data.activo == false
         && request.resource.data.desactivadoAt == request.time
         && request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['activo', 'desactivadoAt']);
+    }
+
+    function validCoordinatorAccountTransferOnDeletion(uid) {
+      let communityId = resource.data.get('comunidadId', null);
+      let communityPath = /databases/$(database)/documents/comunidades/$(communityId is string ? communityId : 'no-community');
+      let currentCommunity = get(communityPath).data;
+      let updatedCommunity = getAfter(communityPath).data;
+      return communityId is string
+        && communityId.size() > 0
+        && exists(communityPath)
+        && existsAfter(communityPath)
+        && (currentCommunity.get('coordinadorUid', null) == uid
+          ? currentCommunity.get('coordinadorAlternoUid', null) is string
+            && currentCommunity.coordinadorAlternoUid != uid
+            && updatedCommunity.coordinadorUid == currentCommunity.coordinadorAlternoUid
+            && updatedCommunity.get('coordinadorAlternoUid', null) == null
+          : currentCommunity.get('coordinadorAlternoUid', null) == uid
+            ? updatedCommunity.coordinadorUid == currentCommunity.get('coordinadorUid', null)
+              && updatedCommunity.get('coordinadorAlternoUid', null) == null
+            : updatedCommunity.get('coordinadorUid', null)
+                == currentCommunity.get('coordinadorUid', null)
+              && updatedCommunity.get('coordinadorAlternoUid', null)
+                == currentCommunity.get('coordinadorAlternoUid', null));
+    }
+
+    function validAccountDeletion(uid) {
+      return self(uid)
+        && activeUser()
+        && resource.data.activo == true
+        && resource.data.get('rol', 'vecino') in ['vecino', 'coordinador', 'seguridad', 'agente']
+        && resource.data.get('patrullaId', null) in [null, '']
+        && (resource.data.get('rol', 'vecino') != 'coordinador'
+          || validCoordinatorAccountTransferOnDeletion(uid));
+    }
+
+    function validIncidentAnonymization() {
+      let uid = request.auth.uid;
+      let oldReporters = resource.data.get('reporterUids', []);
+      let newReporters = request.resource.data.get('reporterUids', []);
+      let previousLastReporter = resource.data.get('ultimaAgrupacionUid', null);
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      let wasReporter = uid in oldReporters;
+      let wasResolver = resource.data.get('resueltoPorUid', null) == uid;
+      return activeUser()
+        && profile(uid).rol in ['vecino', 'coordinador', 'seguridad', 'agente']
+        && (wasReporter || wasResolver)
+        && changed.hasOnly(['reporterUids', 'ultimaAgrupacionUid', 'resueltoPorUid'])
+        && (wasReporter
+          ? changed.hasAll(['reporterUids', 'ultimaAgrupacionUid'])
+            && newReporters is list
+            && newReporters.size() == oldReporters.size() - 1
+            && !(uid in newReporters)
+            && newReporters.toSet() == oldReporters.toSet().difference([uid].toSet())
+            && request.resource.data.get('ultimaAgrupacionUid', null)
+              == (previousLastReporter == uid ? null : previousLastReporter)
+          : !changed.hasAny(['reporterUids', 'ultimaAgrupacionUid']))
+        && (wasResolver
+          ? changed.hasAny(['resueltoPorUid'])
+            && request.resource.data.get('resueltoPorUid', null) == null
+          : !changed.hasAny(['resueltoPorUid']));
+    }
+
+    function validOwnDelegationDelete(comunidadId) {
+      return activeUser()
+        && profile(request.auth.uid).comunidadId == comunidadId
+        && resource.data.get('coordinadorUid', null) == request.auth.uid;
+    }
+
+    function validDelegateSelfRemoval(comunidadId) {
+      return activeUser()
+        && profile(request.auth.uid).rol in ['vecino', 'coordinador', 'seguridad', 'agente']
+        && profile(request.auth.uid).comunidadId == comunidadId
+        && resource.data.get('suplenteUid', null) == request.auth.uid
+        && request.resource.data.get('suplenteUid', null) == null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['suplenteUid']);
+    }
+
+    function validCoordinatorMetadataCreate(comunidadId) {
+      let data = request.resource.data;
+      let uid = request.auth.uid;
+      return activeUser()
+        && profile(uid).rol == 'coordinador'
+        && profile(uid).comunidadId == comunidadId
+        && data.keys().hasOnly(['coordinadorUid', 'coordinadorAlternoUid', 'updatedAt'])
+        && data.keys().hasAll(['coordinadorUid', 'coordinadorAlternoUid', 'updatedAt'])
+        && data.coordinadorUid == uid
+        && data.coordinadorAlternoUid == null
+        && data.updatedAt == request.time;
+    }
+
+    function validCoordinatorMetadataRegistration(comunidadId) {
+      let data = request.resource.data;
+      let uid = request.auth.uid;
+      let currentCoordinator = resource.data.get('coordinadorUid', null);
+      let currentAlternate = resource.data.get('coordinadorAlternoUid', null);
+      return activeUser()
+        && profile(uid).rol == 'coordinador'
+        && profile(uid).comunidadId == comunidadId
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['coordinadorUid', 'coordinadorAlternoUid', 'updatedAt'])
+        && data.updatedAt == request.time
+        && (currentCoordinator in [null, '']
+          && data.coordinadorUid == uid
+          && data.coordinadorAlternoUid == currentAlternate
+          || currentCoordinator is string
+          && currentCoordinator != uid
+          && currentAlternate in [null, '']
+          && data.coordinadorUid == currentCoordinator
+          && data.coordinadorAlternoUid == uid);
+    }
+
+    function validCoordinatorMetadataDeletion(comunidadId) {
+      let uid = request.auth.uid;
+      let profilePath = /databases/$(database)/documents/usuarios/$(uid);
+      let data = request.resource.data;
+      let currentCoordinator = resource.data.get('coordinadorUid', null);
+      let currentAlternate = resource.data.get('coordinadorAlternoUid', null);
+      return self(uid)
+        && activeUser()
+        && profile(uid).rol == 'coordinador'
+        && profile(uid).comunidadId == comunidadId
+        && !existsAfter(profilePath)
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['coordinadorUid', 'coordinadorAlternoUid', 'updatedAt'])
+        && data.updatedAt == request.time
+        && (currentCoordinator == uid
+          && currentAlternate is string
+          && currentAlternate != uid
+          && data.coordinadorUid == currentAlternate
+          && data.coordinadorAlternoUid == null
+          || currentAlternate == uid
+          && data.coordinadorUid == currentCoordinator
+          && data.coordinadorAlternoUid == null);
+    }
+
+    function validCoordinatorMetadataPromotion(comunidadId) {
+      let uid = request.auth.uid;
+      let profilePath = /databases/$(database)/documents/usuarios/$(uid);
+      let data = request.resource.data;
+      let currentCoordinator = resource.data.get('coordinadorUid', null);
+      let currentAlternate = resource.data.get('coordinadorAlternoUid', null);
+      return self(uid)
+        && authorizedAdmin()
+        && profile(uid).rol == 'coordinador'
+        && profile(uid).comunidadId == comunidadId
+        && getAfter(profilePath).data.rol == 'administrador'
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['coordinadorUid', 'coordinadorAlternoUid', 'updatedAt'])
+        && data.updatedAt == request.time
+        && (currentCoordinator == uid
+          && data.coordinadorUid == currentAlternate
+          && data.coordinadorAlternoUid == null
+          || currentAlternate == uid
+          && data.coordinadorUid == currentCoordinator
+          && data.coordinadorAlternoUid == null);
+    }
+
+    function validOwnZoneAnonymization(comunidadId) {
+      return activeUser()
+        && profile(request.auth.uid).comunidadId == comunidadId
+        && resource.data.get('updatedBy', null) == request.auth.uid
+        && request.resource.data.get('updatedBy', null) == null
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['updatedBy', 'updatedAt']);
+    }
+
+    function validOwnCommunityAnnouncementAnonymization(comunidadId) {
+      return activeUser()
+        && profile(request.auth.uid).comunidadId == comunidadId
+        && resource.data.get('autorUid', null) == request.auth.uid
+        && request.resource.data.get('autorUid', null) == null
+        && request.resource.data.autorNombre == 'Usuario eliminado'
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['autorUid', 'autorNombre']);
+    }
+
+    function validOwnOfficialNoticeAnonymization() {
+      return activeUser()
+        && profile(request.auth.uid).comunidadId == resource.data.comunidadId
+        && resource.data.get('autorUid', null) == request.auth.uid
+        && request.resource.data.get('autorUid', null) == null
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['autorUid']);
+    }
+
+    function validOwnOpenAlertAnonymization() {
+      return self(resource.data.get('creadorId', null))
+        && activeUser()
+        && request.resource.data.get('creadorId', null) == null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['creadorId']);
+    }
+
+    function validOwnAuditLogAnonymization() {
+      return activeUser()
+        && profile(request.auth.uid).comunidadId == resource.data.comunidadId
+        && resource.data.get('operadorId', null) == request.auth.uid
+        && request.resource.data.get('operadorId', null) == null
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['operadorId']);
+    }
+
+    function validOwnAuditLogRead() {
+      let communityId = profile(request.auth.uid).get('comunidadId', null);
+      return activeUser()
+        && communityId is string
+        && communityId.size() > 0
+        && resource.data.get('comunidadId', null) == communityId
+        && resource.data.get('operadorId', null) == request.auth.uid;
+    }
+
+    function validOwnPatrolAnonymization() {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      return activeUser()
+        && profile(request.auth.uid).rol in ['seguridad', 'agente']
+        && profile(request.auth.uid).comunidadId == resource.data.comunidadId
+        && resource.data.get('agenteUid', null) == request.auth.uid
+        && request.resource.data.get('agenteUid', null) == null
+        && request.resource.data.get('latitud', null) == null
+        && request.resource.data.get('longitud', null) == null
+        && request.resource.data.get('precisionMetros', null) == null
+        && request.resource.data.updatedAt == request.time
+        && changed.hasOnly([
+          'agenteUid',
+          'latitud',
+          'longitud',
+          'precisionMetros',
+          'updatedAt'
+        ]);
+    }
+
+    function validOwnInvitationAnonymization() {
+      let uid = request.auth.uid;
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      let deletingCreator = resource.data.get('creadoPor', null) == uid;
+      let deletingUser = resource.data.get('usadoPor', null) == uid;
+      return activeUser()
+        && (deletingCreator || deletingUser)
+        && changed.hasOnly(['creadoPor', 'usadoPor', 'activo'])
+        && (deletingCreator
+          ? request.resource.data.get('creadoPor', null) == null
+            && request.resource.data.activo == false
+          : !changed.hasAny(['creadoPor', 'activo']))
+        && (deletingUser
+          ? request.resource.data.get('usadoPor', null) == null
+          : !changed.hasAny(['usadoPor']));
     }
 
     function validZoneWrite(comunidadId) {
@@ -1833,7 +2080,7 @@ service cloud.firestore {
       allow get: if self(uid) || authorizedAdmin();
       allow list: if authorizedAdmin();
       allow create: if validRegistrationProfile(uid);
-      allow delete: if false;
+      allow delete: if validAccountDeletion(uid);
       allow update: if validAdminAccountPromotion(uid)
         || validRoleRequestDecision()
         || validProfileUpdate(uid)
@@ -1858,12 +2105,15 @@ service cloud.firestore {
         allow update: if self(uid)
           && activeUser()
           && validRatingUpdate(uid, alertaId);
-        allow delete: if false;
+        allow delete: if self(uid) && activeUser();
       }
 
       match /limites/{limiteId} {
         allow get: if self(uid) && limiteId == 'reportes_emergencia';
-        allow list, delete: if false;
+        allow list: if false;
+        allow delete: if self(uid)
+          && activeUser()
+          && limiteId == 'reportes_emergencia';
         allow create: if self(uid)
           && activeUser()
           && limiteId == 'reportes_emergencia'
@@ -1892,7 +2142,8 @@ service cloud.firestore {
           && request.resource.data.alertaId == alertaId
           && request.resource.data.readAt == request.time
           && exists(/databases/$(database)/documents/alertas_publicas/$(alertaId));
-        allow update, delete: if false;
+        allow update: if false;
+        allow delete: if self(uid) && activeUser();
       }
 
       match /avisos_leidos/{avisoId} {
@@ -1906,7 +2157,8 @@ service cloud.firestore {
           && exists(/databases/$(database)/documents/avisos_publicos/$(avisoId))
           && get(/databases/$(database)/documents/avisos_publicos/$(avisoId)).data.comunidadId
             == profile(uid).comunidadId;
-        allow update, delete: if false;
+        allow update: if false;
+        allow delete: if self(uid) && activeUser();
       }
     }
 
@@ -1919,9 +2171,12 @@ service cloud.firestore {
 
     match /invitaciones/{invitacionId} {
       allow get: if signedIn() && validInvitationId(invitacionId);
-      allow list: if false;
+      allow list: if signedIn()
+        && (resource.data.get('creadoPor', null) == request.auth.uid
+          || resource.data.get('usadoPor', null) == request.auth.uid);
       allow create: if validInvitationCreate(invitacionId);
-      allow update: if validInvitationUse(invitacionId);
+      allow update: if validInvitationUse(invitacionId)
+        || validOwnInvitationAnonymization();
       allow delete: if false;
     }
 
@@ -1932,19 +2187,23 @@ service cloud.firestore {
           && resource.data.comunidadId.size() > 0
           && profile(request.auth.uid).comunidadId == resource.data.comunidadId
         || activeUser()
-          && request.auth.uid in resource.data.get('reporterUids', []);
+          && request.auth.uid in resource.data.get('reporterUids', [])
+        || activeUser()
+          && request.auth.uid == resource.data.get('resueltoPorUid', null);
       allow create: if activeUser() && validIncidentCreate(incidenteId);
 
       match /calificaciones/{uid} {
         allow get: if self(uid);
         allow list: if false;
         allow create: if validRatingCreate(uid, incidenteId);
-        allow update, delete: if false;
+        allow update: if false;
+        allow delete: if self(uid) && activeUser();
       }
 
       allow update: if validIncidentUpdate(incidenteId)
         || validIncidentCommunitySync()
-        || validIncidentGroupUpdate(incidenteId);
+        || validIncidentGroupUpdate(incidenteId)
+        || validIncidentAnonymization();
       allow delete: if false;
     }
 
@@ -1952,16 +2211,20 @@ service cloud.firestore {
       allow get: if self(resource.data.creadorId)
         || activeUser()
           && profile(request.auth.uid).rol in ['seguridad', 'agente', 'administrador', 'admin'];
-      allow list: if activeUser()
-        && profile(request.auth.uid).rol in ['seguridad', 'agente', 'administrador', 'admin'];
+      allow list: if signedIn()
+          && resource.data.get('creadorId', null) == request.auth.uid
+        || activeUser()
+          && profile(request.auth.uid).rol in ['seguridad', 'agente', 'administrador', 'admin'];
       allow create: if validOpenEmergencyCreate();
-      allow update: if validOpenEmergencyAssignment();
-      allow delete: if false;
+      allow update: if validOpenEmergencyAssignment()
+        || validOwnOpenAlertAnonymization();
+      allow delete: if self(resource.data.get('creadorId', null));
     }
 
     match /limites_alertas_abiertas/{uid} {
       allow get: if self(uid);
-      allow list, delete: if false;
+      allow list: if false;
+      allow delete: if self(uid) && activeUser();
       allow create: if validOpenEmergencyThrottle(uid);
       allow update: if validOpenEmergencyThrottle(uid)
         && resource.data.uid == uid
@@ -1980,7 +2243,8 @@ service cloud.firestore {
       allow read: if activeUser()
         && resource.data.comunidadId == profile(request.auth.uid).comunidadId;
       allow create: if validOfficialNoticeCreate();
-      allow update, delete: if false;
+      allow update: if validOwnOfficialNoticeAnonymization();
+      allow delete: if false;
     }
 
     match /auditoria/{eventoId} {
@@ -1990,18 +2254,25 @@ service cloud.firestore {
 
     match /logs/{logId} {
       allow create: if validAuditLogCreate();
-      allow read: if staffForCommunity(resource.data.get('comunidadId', null));
-      allow update, delete: if false;
+      allow read: if staffForCommunity(resource.data.get('comunidadId', null))
+        || validOwnAuditLogRead();
+      allow update: if validOwnAuditLogAnonymization();
+      allow delete: if false;
     }
 
     match /mensajes_salientes/{messageId} {
       allow create: if validOutgoingContactMessage();
-      allow read, update, delete: if false;
+      allow list: if activeUser()
+        && resource.data.get('usuarioId', null) == request.auth.uid;
+      allow get, update: if false;
+      allow delete: if activeUser()
+        && resource.data.get('usuarioId', null) == request.auth.uid;
     }
 
     match /zonas/{comunidadId} {
       allow read: if sameCommunity(comunidadId);
-      allow create, update: if validZoneWrite(comunidadId);
+      allow create: if validZoneWrite(comunidadId);
+      allow update: if validZoneWrite(comunidadId) || validOwnZoneAnonymization(comunidadId);
       allow delete: if false;
     }
 
@@ -2009,8 +2280,10 @@ service cloud.firestore {
       allow read: if staffForCommunity(delegacionId)
         || activeDelegation()
         || neighborCanReadCommunityDelegation(delegacionId);
-      allow create, update: if validDelegationWrite(delegacionId);
-      allow delete: if false;
+      allow create: if validDelegationWrite(delegacionId);
+      allow update: if validDelegationWrite(delegacionId)
+        || validDelegateSelfRemoval(delegacionId);
+      allow delete: if validOwnDelegationDelete(delegacionId);
     }
 
     match /patrullas/{patrullaId} {
@@ -2024,7 +2297,8 @@ service cloud.firestore {
           && profile(request.auth.uid).patrullaId == patrullaId
           && profile(request.auth.uid).comunidadId == resource.data.comunidadId
           && validPatrolUpdate(patrullaId))
-        || adminOperator() && validPatrolUpdate(patrullaId);
+        || adminOperator() && validPatrolUpdate(patrullaId)
+        || validOwnPatrolAnonymization();
       allow delete: if false;
     }
 
@@ -2033,7 +2307,9 @@ service cloud.firestore {
     }
 
     match /dni_index/{dni} {
-      allow read, list, update, delete: if false;
+      allow get: if activeUser() && profile(request.auth.uid).dni == dni;
+      allow list, update: if false;
+      allow delete: if self(resource.data.get('uid', null)) && activeUser();
       allow create: if signedIn()
         && dni.matches('^[0-9]{8}$')
         && request.resource.data.keys().hasOnly(['uid', 'createdAt'])
@@ -2048,7 +2324,11 @@ service cloud.firestore {
     match /comunidades/{comunidadId} {
       allow get: if sameCommunity(comunidadId);
       allow list: if false;
-      allow create, update, delete: if false;
+      allow create: if validCoordinatorMetadataCreate(comunidadId);
+      allow update: if validCoordinatorMetadataRegistration(comunidadId)
+        || validCoordinatorMetadataDeletion(comunidadId)
+        || validCoordinatorMetadataPromotion(comunidadId);
+      allow delete: if false;
 
       match /miembros/{uid} {
         allow get: if sameCommunity(comunidadId)
@@ -2059,21 +2339,28 @@ service cloud.firestore {
         allow create: if validMemberJoin(comunidadId, uid);
         allow update: if validCommunityMemberLocationUpdate(comunidadId, uid)
           || validCommunityMemberProfileUpdate(comunidadId, uid);
-        allow delete: if false;
+        allow delete: if self(uid)
+          && activeUser()
+          && profile(uid).comunidadId == comunidadId;
       }
 
       match /contactos_emergencia/{uid} {
-        allow get: if canReadCommunityEmergencyContacts(comunidadId);
+        allow get: if canReadCommunityEmergencyContacts(comunidadId)
+          || self(uid)
+          && activeUser()
+          && profile(uid).comunidadId == comunidadId;
         allow list: if false;
         allow create, update: if validCommunityEmergencyContactsWrite(comunidadId, uid);
-        allow delete: if false;
+        allow delete: if self(uid)
+          && activeUser()
+          && profile(uid).comunidadId == comunidadId;
       }
 
       match /anuncios/{anuncioId} {
         allow read: if sameCommunity(comunidadId);
         allow create: if validCommunityAnnouncementCreate(comunidadId);
         allow delete: if validCommunityAnnouncementDelete(comunidadId);
-        allow update: if false;
+        allow update: if validOwnCommunityAnnouncementAnonymization(comunidadId);
       }
     }
 
