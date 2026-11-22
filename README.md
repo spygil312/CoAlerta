@@ -45,8 +45,11 @@ El proyecto se encuentra desplegado y accesible para el público a través de Gi
 ---
 
 ## 👨‍💻 Créditos
-Este proyecto es de código abierto y fue desarrollado por:
 Giliam de la Rosa Toro
+Gerardo Altamirano
+Alejandro Condori
+Félix Vargas
+Rafael Miranda
 
 ## 📄 Licencia
 Este proyecto es de Código Abierto (Open Source). Está disponible de forma libre y gratuita para cualquier persona que tenga el enlace al repositorio, permitiendo su uso, estudio y modificación comunitaria.
