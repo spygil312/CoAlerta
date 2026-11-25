@@ -6,7 +6,6 @@ import {
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
 
-/* SERVICIOS FIREBASE */
 (function () {
     const DEFAULT_COMMUNITY_ID = "comunidad_general_1";
     const activeStates = new Set([
@@ -1438,8 +1437,6 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
         incidente,
         cambios
     ) {
-        // La retención de dos años requiere configurar Firestore TTL sobre expiresAt;
-        // este comentario no configura ni garantiza por sí solo esa política.
         transaction.set(logRef, {
             alertaId,
             operadorId: usuarioId,
