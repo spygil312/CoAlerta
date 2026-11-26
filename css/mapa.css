@@ -1018,7 +1018,7 @@ body.role-security .menu-inferior-mobile a[data-role-link="security"] {
   }
 
   .mapa-superior-acciones .btn-filtro {
-    top: 140px;
+    top: 120px;
     right: 5px;
     width: 52px;
     min-width: 52px;
@@ -1072,7 +1072,7 @@ body.role-security .menu-inferior-mobile a[data-role-link="security"] {
     overflow: hidden;
   }
 
-  .mapa-estadisticas .estadistica-card:last-child { grid-column: 1 / -1; }
+  .mapa-estadisticas { grid-template-columns: repeat(3, minmax(0, 1fr));}
 
   .estadistica-card {
     display: grid;

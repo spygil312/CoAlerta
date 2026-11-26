@@ -436,12 +436,18 @@ function crearFilaAlerta(alerta) {
         document.createTextNode(` ${estadoEnProceso ? "En proceso" : estado.etiqueta}`)
     );
     estadoCelda.appendChild(estadoEtiqueta);
+
+    const tiempoRespuestaCelda = document.createElement("td");
+    tiempoRespuestaCelda.className = "celda-tiempo-respuesta";
     const tiempoRespuesta = document.createElement("small");
     tiempoRespuesta.className = "tiempo-respuesta-historial";
-    tiempoRespuesta.style.display = "block";
-    tiempoRespuesta.style.marginTop = "6px";
-    tiempoRespuesta.textContent = `Tiempo de respuesta: ${formatearTiempoRespuesta(alerta)}`;
-    estadoCelda.appendChild(tiempoRespuesta);
+    const tiempoRespuestaIcono = document.createElement("i");
+    tiempoRespuestaIcono.className = "fa-solid fa-stopwatch";
+    tiempoRespuestaIcono.setAttribute("aria-hidden", "true");
+    const tiempoRespuestaTexto = document.createElement("span");
+    tiempoRespuestaTexto.textContent = formatearTiempoRespuesta(alerta);
+    tiempoRespuesta.append(tiempoRespuestaIcono, tiempoRespuestaTexto);
+    tiempoRespuestaCelda.appendChild(tiempoRespuesta);
 
     const accionCelda = document.createElement("td");
     const botonDetalle = document.createElement("button");
@@ -466,7 +472,15 @@ function crearFilaAlerta(alerta) {
     });
     accionCelda.appendChild(botonDetalle);
 
-    fila.append(tipoCelda, ubicacionCelda, fechaCelda, horaCelda, estadoCelda, accionCelda);
+    fila.append(
+        tipoCelda,
+        ubicacionCelda,
+        fechaCelda,
+        horaCelda,
+        estadoCelda,
+        tiempoRespuestaCelda,
+        accionCelda
+    );
 
     return {
         elemento: fila,

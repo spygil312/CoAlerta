@@ -13,7 +13,8 @@
   .hero { padding: 70px 0; }
   .hero-contenido { grid-template-columns: 1fr; gap: 50px; }
   .hero-texto { text-align: center; }
-  .hero-botones, .hero-seguridad, .hero-panel { justify-content: center; }
+  .hero-texto p {margin-left: auto; margin-right: auto;}
+  .hero-botones, .hero-seguridad, .hero-panel, .consentimiento-gps { justify-content: center; }
   .panel-app { width: min(100%, 520px); }
 
   .beneficios-grid { grid-template-columns: repeat(2, 1fr); }

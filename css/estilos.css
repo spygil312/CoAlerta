@@ -78,6 +78,8 @@
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html { min-height: 100%; overflow-y: auto; scroll-behavior: smooth; }
+::-webkit-scrollbar { width: 14px; }
+::-webkit-scrollbar-thumb { background-color: #888;border-radius: 8px;}
 
 body {
   min-height: 100vh;
@@ -88,13 +90,7 @@ body {
 }
 
 a { text-decoration: none; color: inherit; }
-
-button,
-input,
-select,
-textarea {
-  font-family: inherit;
-}
+button, input, select, textarea { font-family: inherit;}
 button { cursor: pointer; }
 img { max-width: 100%; display: block; }
 

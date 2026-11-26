@@ -147,6 +147,7 @@
 .ver-password {
   min-width: 44px;
   min-height: 44px;
+  right: 5px;
   display: grid;
   place-items: center;
 }

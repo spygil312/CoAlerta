@@ -125,7 +125,6 @@
 }
 
 .central-filtros label { display: inline-flex; align-items: center; gap: 5px; }
-
 .central-filtros input { accent-color: #16835d; }
 
 .central-alertas-lista {
@@ -133,7 +132,6 @@
   gap: 10px;
   max-height: min(60vh, 620px);
   overflow-y: auto;
-  overscroll-behavior: contain;
   padding: 2px 8px 2px 2px;
 }
 

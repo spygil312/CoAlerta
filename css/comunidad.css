@@ -486,7 +486,7 @@ body.pagina-comunidad { min-width: 320px; min-height: 100vh; }
 
 .sin-datos { padding: 16px 0; color: var(--texto-secundario); font-size: 13px; }
 .lista-items div:last-child { border-bottom: none; padding-bottom: 0; }
-.icono-flecha { margin-left: auto; color: var(--borde-oscuro); font-size: 12px; }
+.icono-flecha { margin-left: auto; color: var(--borde-oscuro); font-size: 25px; }
 
 .avatar-letras {
   position: relative;

@@ -43,6 +43,7 @@
   color: var(--blanco);
 }
 
+.registro-principal .ver-password {right: 45px;}
 .registro-mensaje h1 span { color: #b8f2d5; }
 
 .registro-logo {
@@ -139,10 +140,9 @@
 .registro-formulario-header p { color: var(--texto-secundario); font-size: 15px; }
 .form-registro { display: flex; flex-direction: column; gap: 18px; }
 
-.input-con-icono input,
-.input-con-icono select {
+.input-con-icono input, .input-con-icono select {
   width: 100%;
-  padding: 14px 15px 14px 45px;
+  padding: 14px 46px 14px 45px;
   border: 1px solid var(--borde);
   border-radius: 12px;
   font-size: 15px;
