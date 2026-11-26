@@ -309,6 +309,30 @@ service cloud.firestore {
         ).data.comunidadId == comunidadId;
     }
 
+    function validCommunityLeave(uid, comunidadId) {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      let safeCommunityId = comunidadId is string && comunidadId.size() > 0
+        ? comunidadId
+        : 'no-community';
+      let memberPath = /databases/$(database)/documents/comunidades/$(safeCommunityId)/miembros/$(uid);
+      let contactsPath = /databases/$(database)/documents/comunidades/$(safeCommunityId)/contactos_emergencia/$(uid);
+      return self(uid)
+        && activeUser()
+        && !activeDelegation()
+        && profile(uid).rol in ['vecino', 'seguridad']
+        && comunidadId is string
+        && comunidadId.size() > 0
+        && resource.data.comunidadId == comunidadId
+        && resource.data.get('patrullaId', null) in [null, '']
+        && changed.hasOnly(['comunidadId', 'invitacionId', 'ultimaUbicacion'])
+        && changed.hasAll(['comunidadId'])
+        && request.resource.data.comunidadId == null
+        && request.resource.data.get('invitacionId', null) == null
+        && request.resource.data.get('ultimaUbicacion', null) == null
+        && !existsAfter(memberPath)
+        && !existsAfter(contactsPath);
+    }
+
     function validIncidentCommunitySync() {
       let changed = request.resource.data.diff(resource.data).affectedKeys();
       let reporters = resource.data.get('reporterUids', []);
@@ -2084,6 +2108,7 @@ service cloud.firestore {
       allow update: if validAdminAccountPromotion(uid)
         || validRoleRequestDecision()
         || validProfileUpdate(uid)
+        || validCommunityLeave(uid, resource.data.get('comunidadId', null))
         || self(uid)
         && activeUser()
         && validSelfLocationUpdate(uid)

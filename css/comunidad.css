@@ -255,6 +255,15 @@ body.pagina-comunidad { min-width: 320px; min-height: 100vh; }
 
 .comunidad-acciones .btn-secundario-pequeno { white-space: nowrap; }
 
+.comunidad-acciones .btn-salir-comunidad {
+  color: #b42318;
+  border-color: #b42318;
+}
+
+.comunidad-acciones .btn-salir-comunidad:hover {
+  background: #fff1f0;
+}
+
 .comunidad-acciones button[hidden],
 #btn-nuevo-anuncio[hidden] {
   display: none;
@@ -708,6 +717,49 @@ body.pagina-comunidad { min-width: 320px; min-height: 100vh; }
 
 .modal-body { padding: 20px; }
 .modal-lista-contenido > :last-child { border-bottom: 0; }
+
+.salir-comunidad-aviso {
+  margin-top: 12px;
+  color: var(--texto-secundario);
+  font-size: 13px;
+}
+
+.salir-comunidad-estado {
+  margin-top: 12px;
+  color: #b42318;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.salir-comunidad-estado:empty { display: none; }
+
+.salir-comunidad-acciones {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.btn-confirmar-salida {
+  min-height: 44px;
+  border: 1px solid #b42318;
+  border-radius: 8px;
+  background: #b42318;
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-confirmar-salida:hover { background: #8f1b13; }
+
+.salir-comunidad-acciones button:disabled {
+  cursor: wait;
+  opacity: .65;
+}
+
 .form-grupo { margin-bottom: 15px; display: flex; flex-direction: column; gap: 8px; }
 .form-grupo label { color: var(--texto); font-size: 13px; font-weight: 600; }
 

@@ -261,6 +261,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     async function completeLogin(user, profile) {
+        let hasAdminClaim = false;
         try {
             const displayName = profile.nombre || user.displayName || "Usuario";
             if (user.displayName !== displayName) await updateProfile(user, { displayName });
@@ -271,13 +272,14 @@ document.addEventListener("DOMContentLoaded", function () {
             localStorage.setItem("coalerta_usuario", JSON.stringify(localProfile));
             localStorage.setItem("coalertaSesion", "activa");
             const tokenResult = await user.getIdTokenResult();
+            hasAdminClaim = profile.activo === true
+                && tokenResult.claims.admin === true
+                && tokenResult.claims.email_verified === true;
             const role = String(profile.rol || "vecino").trim().toLowerCase();
             localStorage.setItem("userRole", JSON.stringify({
                 uid: user.uid,
                 role,
-                isAdmin: profile.activo === true
-                    && tokenResult.claims.admin === true
-                    && tokenResult.claims.email_verified === true
+                isAdmin: hasAdminClaim
             }));
             if (rememberCheckbox.checked) {
                 localStorage.setItem("coalerta_correo_recordado", identifierField.value.trim());
@@ -291,9 +293,14 @@ document.addEventListener("DOMContentLoaded", function () {
 
         const role = String(profile.rol || "").trim().toLowerCase();
         const isOperator = isOperatorRole(role);
-        const destination = role === "coordinador"
-            ? "coordinador_vecinal.html"
-            : isOperator ? "personal_seguridad.html" : "mapa.html";
+        let destination = "mapa.html";
+        if (hasAdminClaim || ["administrador", "admin"].includes(role)) {
+            destination = "administracion.html";
+        } else if (role === "coordinador") {
+            destination = "coordinador_vecinal.html";
+        } else if (isOperator) {
+            destination = "personal_seguridad.html";
+        }
         window.location.replace(destination);
     }
 

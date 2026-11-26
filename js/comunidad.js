@@ -19,6 +19,7 @@ let stopWatchingAnnouncements = null;
 let watchingAnnouncementsUid = null;
 let watchingAnnouncementsCommunityId = null;
 let solicitudPerfilVecino = 0;
+let elementoEnfoqueAntesDeSalir = null;
 const listasAmpliables = new Map();
 const configuracionListas = {
     miembros: {
@@ -68,6 +69,45 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById(configuracion.botonId)?.addEventListener('click', () => {
             mostrarListaCompleta(clave);
         });
+    });
+    document.getElementById('btn-salir-comunidad')?.addEventListener(
+        'click',
+        abrirConfirmacionSalida
+    );
+    document.getElementById('btn-cancelar-salida')?.addEventListener(
+        'click',
+        cerrarConfirmacionSalida
+    );
+    document.getElementById('btn-confirmar-salida')?.addEventListener(
+        'click',
+        confirmarSalidaComunidad
+    );
+    document.getElementById('modal-salir-comunidad')?.addEventListener('click', (evento) => {
+        if (evento.target === evento.currentTarget) cerrarConfirmacionSalida();
+    });
+    document.addEventListener('keydown', (evento) => {
+        const modal = document.getElementById('modal-salir-comunidad');
+        if (evento.key === 'Escape' && modal?.classList.contains('activo')) {
+            cerrarConfirmacionSalida();
+        }
+        if (evento.key === 'Tab' && modal?.classList.contains('activo')) {
+            const focusable = [...modal.querySelectorAll(
+                'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
+            )];
+            if (!focusable.length) return;
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            if (!modal.contains(document.activeElement)) {
+                evento.preventDefault();
+                (evento.shiftKey ? last : first).focus();
+            } else if (evento.shiftKey && document.activeElement === first) {
+                evento.preventDefault();
+                last.focus();
+            } else if (!evento.shiftKey && document.activeElement === last) {
+                evento.preventDefault();
+                first.focus();
+            }
+        }
     });
     document.getElementById('modal-lista-comunidad')?.addEventListener('click', (evento) => {
         if (evento.target === evento.currentTarget) cerrarModal('modal-lista-comunidad');
@@ -1130,6 +1170,61 @@ async function procesarUnion() {
     }
 }
 
+function abrirConfirmacionSalida() {
+    const role = usuarioActual?.rol;
+    if (!usuarioActual?.comunidadId || !['vecino', 'seguridad'].includes(role)) return;
+
+    const modal = document.getElementById('modal-salir-comunidad');
+    const cancelButton = document.getElementById('btn-cancelar-salida');
+    const status = document.getElementById('estado-salida-comunidad');
+    if (!modal || !cancelButton || !status) return;
+
+    elementoEnfoqueAntesDeSalir = document.activeElement;
+    status.textContent = '';
+    modal.classList.add('activo');
+    cancelButton.focus();
+}
+
+function cerrarConfirmacionSalida() {
+    const modal = document.getElementById('modal-salir-comunidad');
+    const confirmButton = document.getElementById('btn-confirmar-salida');
+    if (!modal || confirmButton?.disabled) return;
+    modal.classList.remove('activo');
+    if (elementoEnfoqueAntesDeSalir instanceof HTMLElement) {
+        elementoEnfoqueAntesDeSalir.focus();
+    }
+    elementoEnfoqueAntesDeSalir = null;
+}
+
+async function confirmarSalidaComunidad() {
+    if (!usuarioActual?.comunidadId || !['vecino', 'seguridad'].includes(usuarioActual.rol)) {
+        cerrarConfirmacionSalida();
+        return;
+    }
+
+    const cancelButton = document.getElementById('btn-cancelar-salida');
+    const confirmButton = document.getElementById('btn-confirmar-salida');
+    const status = document.getElementById('estado-salida-comunidad');
+    if (!confirmButton || !status) return;
+
+    confirmButton.disabled = true;
+    if (cancelButton) cancelButton.disabled = true;
+    status.textContent = 'Procesando tu salida de la comunidad…';
+    status.focus();
+    try {
+        await window.coalertaData.leaveCommunity();
+        status.textContent = 'Salida confirmada. Actualizando tu cuenta…';
+        location.reload();
+    } catch (error) {
+        console.error('No se pudo salir de la comunidad:', error);
+        status.textContent = error.code === 'permission-denied'
+            ? 'Firestore rechazó la operación. Verifica que las reglas actualizadas estén publicadas.'
+            : error.message || 'No se pudo salir de la comunidad. Inténtalo nuevamente.';
+        confirmButton.disabled = false;
+        if (cancelButton) cancelButton.disabled = false;
+    }
+}
+
 function obtenerIniciales(nombre) {
     if (!nombre) return "U";
     const partes = nombre.trim().split(/\s+/).filter(Boolean);
@@ -1148,10 +1243,13 @@ function configurarSegunRol() {
     const invitar = document.getElementById('btn-generar-codigo');
     const publicar = document.getElementById('btn-nuevo-anuncio');
     const unirse = document.getElementById('btn-unirse-comunidad');
+    const salir = document.getElementById('btn-salir-comunidad');
 
     if (invitar) invitar.hidden = !esCoordinador;
     if (publicar) publicar.hidden = !esCoordinador || !usuarioActual.comunidadId;
     if (unirse) unirse.hidden = Boolean(usuarioActual.comunidadId) ||
+        !['vecino', 'seguridad'].includes(usuarioActual.rol);
+    if (salir) salir.hidden = !usuarioActual.comunidadId ||
         !['vecino', 'seguridad'].includes(usuarioActual.rol);
 }
 

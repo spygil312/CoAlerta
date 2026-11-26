@@ -36,7 +36,7 @@
     <link rel="stylesheet" href="../css/estilos.css?v=native-scrollbar-20261125-4">
     <link rel="stylesheet" href="../css/responsive.css?v=mobile-type-review-20261125">
     <link rel="stylesheet" href="../css/mapa.css?v=mobile-map-type-20261125-7">
-    <link rel="stylesheet" href="../css/comunidad.css?v=community-sidebar-size-20261125-1">
+    <link rel="stylesheet" href="../css/comunidad.css?v=community-leave-dialog-20261125">
     <script src="../js/tema.js?v=20261029-theme-scroll"></script>
 </head>
 
@@ -157,6 +157,10 @@
                         <button id="btn-unirse-comunidad" type="button" class="btn-secundario-pequeno"
                             onclick="abrirModal('modal-unirse')" hidden>
                             <i class="fa-solid fa-right-to-bracket"></i> Unirme a una comunidad
+                        </button>
+                        <button id="btn-salir-comunidad" type="button"
+                            class="btn-secundario-pequeno btn-salir-comunidad" hidden>
+                            <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i> Salir de la comunidad
                         </button>
                     </div>
                 </div>
@@ -329,6 +333,36 @@
             </div>
         </div>
 
+        <div id="modal-salir-comunidad" class="modal-overlay" role="dialog" aria-modal="true"
+            aria-labelledby="modal-salir-comunidad-titulo"
+            aria-describedby="modal-salir-comunidad-descripcion">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="modal-salir-comunidad-titulo">Salir de la comunidad</h3>
+                </div>
+                <div class="modal-body">
+                    <p id="modal-salir-comunidad-descripcion">
+                        Dejarás de recibir los avisos de esta comunidad. Tu cuenta seguirá activa y podrás unirte a otra
+                        comunidad después con un código de invitación.
+                    </p>
+                    <p class="salir-comunidad-aviso">
+                        Si tienes una unidad de seguridad asignada, un administrador deberá retirarla antes de confirmar
+                        la salida.
+                    </p>
+                    <p id="estado-salida-comunidad" class="salir-comunidad-estado" role="status"
+                        aria-live="polite" tabindex="0"></p>
+                    <div class="salir-comunidad-acciones">
+                        <button id="btn-cancelar-salida" class="btn-secundario-pequeno" type="button">
+                            Cancelar
+                        </button>
+                        <button id="btn-confirmar-salida" class="btn-confirmar-salida" type="button">
+                            Confirmar salida
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div id="modal-perfil-vecino" class="modal-overlay">
             <div class="modal-content">
                 <div class="modal-header">
@@ -392,8 +426,8 @@
     <script type="module" src="../js/estado-cuenta.js?v=modular-sdk-1"></script>
     <script src="../js/ubicacion.js?v=shared-distance-utils-20261111"></script>
     <script src="../js/notificaciones.js?v=alerts-sound-independent-20261112"></script>
-    <script type="module" src="../js/coalerta-data.js?v=account-deletion-rules-20261121"></script>
-    <script type="module" src="../js/comunidad.js?v=community-tipo-bomberos-prioridad-20261114"></script>
+    <script type="module" src="../js/coalerta-data.js?v=community-leave-20261125"></script>
+    <script type="module" src="../js/comunidad.js?v=community-leave-20261125"></script>
 </body>
 
 </html>

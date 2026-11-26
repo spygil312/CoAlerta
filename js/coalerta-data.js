@@ -1931,6 +1931,100 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
         return { ok: true, comunidadId: state.profile.comunidadId };
     }
 
+    async function leaveCommunity() {
+        const { user, profile } = requireActiveProfile();
+        const role = effectiveRole();
+        const communityId = String(profile.comunidadId || "").trim();
+        if (!["vecino", "seguridad"].includes(state.role) || role !== state.role) {
+            throw new Error(
+                "Solo los vecinos y el personal de seguridad sin una delegación activa pueden salir de la comunidad."
+            );
+        }
+        if (!communityId) throw new Error("Tu cuenta no pertenece a una comunidad.");
+
+        const profileRef = doc(db, "usuarios", user.uid);
+        const currentProfile = await getDoc(profileRef);
+        if (!currentProfile.exists() || currentProfile.get("activo") !== true ||
+            currentProfile.get("rol") !== state.role ||
+            currentProfile.get("comunidadId") !== communityId) {
+            throw new Error("Tu perfil o comunidad cambió. Actualiza la página e inténtalo nuevamente.");
+        }
+        if (currentProfile.get("patrullaId") != null &&
+            currentProfile.get("patrullaId") !== "") {
+            throw new Error(
+                "Solicita al administrador que retire tu unidad asignada antes de salir de la comunidad."
+            );
+        }
+
+        if (state.role === "seguridad") {
+            const assignedPatrols = query(
+                collection(db, "patrullas"),
+                where("comunidadId", "==", communityId),
+                where("agenteUid", "==", user.uid),
+                limit(400)
+            );
+            while (true) {
+                const patrolSnapshot = await getDocs(assignedPatrols);
+                if (patrolSnapshot.empty) break;
+                const batch = writeBatch(db);
+                patrolSnapshot.docs.forEach((patrol) => {
+                    batch.update(patrol.ref, {
+                        agenteUid: null,
+                        latitud: null,
+                        longitud: null,
+                        precisionMetros: null,
+                        updatedAt: serverTimestamp()
+                    });
+                });
+                await batch.commit();
+            }
+        }
+
+        const memberRef = doc(db, "comunidades", communityId, "miembros", user.uid);
+        const contactsRef = doc(
+            db,
+            "comunidades",
+            communityId,
+            "contactos_emergencia",
+            user.uid
+        );
+        await runTransaction(db, async (transaction) => {
+            const [profileSnapshot, memberSnapshot, contactsSnapshot] = await Promise.all([
+                transaction.get(profileRef),
+                transaction.get(memberRef),
+                transaction.get(contactsRef)
+            ]);
+            if (!profileSnapshot.exists() || profileSnapshot.get("activo") !== true ||
+                profileSnapshot.get("rol") !== state.role ||
+                profileSnapshot.get("comunidadId") !== communityId) {
+                throw new Error("Tu perfil o comunidad cambió. Actualiza la página e inténtalo nuevamente.");
+            }
+            if (profileSnapshot.get("patrullaId") != null &&
+                profileSnapshot.get("patrullaId") !== "") {
+                throw new Error(
+                    "Solicita al administrador que retire tu unidad asignada antes de salir de la comunidad."
+                );
+            }
+            if (memberSnapshot.exists()) transaction.delete(memberRef);
+            if (contactsSnapshot.exists()) transaction.delete(contactsRef);
+            transaction.update(profileRef, {
+                comunidadId: null,
+                invitacionId: null,
+                ultimaUbicacion: null
+            });
+        });
+
+        state.profile = {
+            ...state.profile,
+            comunidadId: null,
+            invitacionId: null,
+            ultimaUbicacion: null
+        };
+        state.zone = null;
+        state.delegation = null;
+        return { ok: true };
+    }
+
     async function createCommunityAnnouncement(announcement) {
         const { user, profile } = requireRole(["coordinador"]);
         const title = String(announcement && announcement.title || "").trim();
@@ -2300,6 +2394,7 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
         saveDelegation,
         generateCommunityInvite,
         joinCommunity,
+        leaveCommunity,
         createCommunityAnnouncement,
         deleteCommunityAnnouncement,
         listCommunityDelegates,
