@@ -1,10 +1,6 @@
-import {
-    browserLocalPersistence, createUserWithEmailAndPassword, onAuthStateChanged,
-    setPersistence, signInWithEmailAndPassword, signOut
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import {
-    doc, runTransaction, serverTimestamp
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { browserLocalPersistence, createUserWithEmailAndPassword, onAuthStateChanged,
+    setPersistence, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { doc, runTransaction, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
 
 document.addEventListener("DOMContentLoaded", function () {
@@ -30,11 +26,9 @@ document.addEventListener("DOMContentLoaded", function () {
         console.error("No se pudo comprobar la sesión antes del registro:", error);
         resolveAuthReady(null);
     });
-
     form.addEventListener("submit", async function (event) {
         event.preventDefault();
         clearMessage();
-
         let data;
         try {
             await authReady;
@@ -71,14 +65,12 @@ document.addEventListener("DOMContentLoaded", function () {
             setBusy(submitButton, false);
         }
     });
-
     document.getElementById("telefono").addEventListener("input", function () {
         this.value = this.value.replace(/\D/g, "").slice(0, 9);
     });
     document.getElementById("dni").addEventListener("input", function () {
         this.value = this.value.replace(/\D/g, "").slice(0, 8);
     });
-
     document.querySelectorAll(".ver-password").forEach((button) => {
         button.addEventListener("click", function () {
             const field = button.closest(".input-con-icono")?.querySelector("input");
@@ -106,7 +98,6 @@ document.addEventListener("DOMContentLoaded", function () {
             field.required = !googleRegistration;
             if (googleRegistration) field.value = "";
         });
-
         const email = document.getElementById("correo");
         if (googleRegistration) {
             email.value = user.email || "";

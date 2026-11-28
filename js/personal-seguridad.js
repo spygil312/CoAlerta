@@ -1,12 +1,8 @@
 import { signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import {
-    collection, doc, getDoc, onSnapshot, query, runTransaction, serverTimestamp, where
+import { collection, doc, getDoc, onSnapshot, query, runTransaction, serverTimestamp, where
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
-import {
-    configurarCierreSesion,
-    escapeHtml
-} from "./general.js?v=shared-core-20261106";
+import { configurarCierreSesion, escapeHtml } from "./general.js?v=shared-core-20261106";
 
 document.addEventListener("DOMContentLoaded", function () {
     const data = window.coalertaData;
@@ -187,13 +183,11 @@ document.addEventListener("DOMContentLoaded", function () {
         const avatar = document.getElementById("sidebarAvatarImg");
         const avatarIcon = document.getElementById("sidebarAvatarIcon");
         const photo = account.fotoBase64 || account.fotoURL || account.photoURL;
-
         nameElement.textContent = `Hola, ${name.trim().split(/\s+/)[0]}`;
         roleElement.textContent = ["administrador", "admin"].includes(data.getRole())
             ? "Administrador"
             : "Personal de seguridad";
         if (!photo) return;
-
         avatar.onerror = function () {
             avatar.hidden = true;
             avatarIcon.hidden = false;
@@ -266,7 +260,6 @@ document.addEventListener("DOMContentLoaded", function () {
         if (cached) return Promise.resolve({ ...incident, ...cached });
         const pending = incidentCoordinateLoads.get(id);
         if (pending) return pending.then((coordinates) => ({ ...incident, ...coordinates }));
-
         const load = getDoc(doc(db, "incidentes", id)).then((snapshot) => {
             if (!snapshot.exists()) {
                 throw new Error("No se encontró el documento del incidente en Firestore.");
@@ -370,7 +363,6 @@ document.addEventListener("DOMContentLoaded", function () {
         const card = document.createElement("article");
         card.className = "seguridad-alert-card";
         card.dataset.selected = String(String(incident.id) === selectedIncidentId);
-
         const select = document.createElement("button");
         select.type = "button";
         select.className = "seguridad-alert-select";
@@ -410,7 +402,6 @@ document.addEventListener("DOMContentLoaded", function () {
             summary.textContent += ` · ${incident.detalle}`;
         }
         select.append(heading, summary);
-
         const actions = document.createElement("div");
         actions.className = "seguridad-card-actions";
         actions.append(makeButton("accept-open", "Atender emergencia"));
@@ -423,7 +414,6 @@ document.addEventListener("DOMContentLoaded", function () {
         const card = document.createElement("article");
         card.className = "seguridad-alert-card";
         card.dataset.selected = String(String(incident.id) === selectedIncidentId);
-
         const category = data.normalizeCategory(incident.tipo || incident.categoria);
         const iconByCategory = {
             robo: "fa-mask-face",
@@ -464,7 +454,6 @@ document.addEventListener("DOMContentLoaded", function () {
         summary.textContent =
             `${incident.detalle || "Sin detalle adicional"} · ${getIncidentLocationLabel(incident)}`;
         select.append(heading, summary);
-
         const actions = document.createElement("div");
         actions.className = "seguridad-card-actions";
         if (incident.estado === "Derivada a Central") {
@@ -834,9 +823,6 @@ document.addEventListener("DOMContentLoaded", function () {
             const point = latestLocationPoint;
             const profile = data.getProfile();
             if (!profile) throw new Error("No se encontró el perfil de seguridad para sincronizar la ubicación.");
-            // La ubicación del personal de serenazgo se publica siempre en su documento de
-            // miembro de la comunidad (es lo que dibuja el mapa), tenga o no patrulla asignada.
-            // Si falla, no debe impedir la actualización de la patrulla ni el despacho.
             let memberLocationError = null;
             if (data.getRole() === "seguridad" && profile.comunidadId) {
                 try {

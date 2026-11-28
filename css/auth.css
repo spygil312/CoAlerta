@@ -1,39 +1,8 @@
 .grupo-formulario { display: flex; flex-direction: column; }
-
-.grupo-formulario label {
-  font-size: 13px;
-  font-weight: 600;
-  margin-bottom: 7px;
-  color: var(--texto);
-}
-
-.volver-inicio {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--texto-secundario);
-  font-size: 14px;
-  margin-bottom: 30px;
-}
-
-.ver-password {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  background: none;
-  border: none;
-  color: var(--texto-secundario);
-  cursor: pointer;
-}
-
-.login-separador::before,
-.login-separador::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: var(--borde);
-}
-
+.grupo-formulario label { font-size: 13px; font-weight: 600; margin-bottom: 7px; color: var(--texto); }
+.volver-inicio { display: flex; align-items: center; gap: 8px; color: var(--texto-secundario); font-size: 14px; margin-bottom: 30px; }
+.ver-password { position: absolute; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--texto-secundario); cursor: pointer; }
+.login-separador::before, .login-separador::after { content: ""; flex: 1; height: 1px; background: var(--borde); }
 .btn-google {
   width: 100%;
   padding: 13px;
@@ -48,16 +17,5 @@
   gap: 12px;
   transition: 0.2s;
 }
-
 .btn-google:hover { background: var(--fondo); }
-
-.login-aviso {
-  margin-top: 25px;
-  text-align: center;
-  font-size: 13px;
-  color: var(--texto-secundario);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
+.login-aviso { margin-top: 25px; text-align: center; font-size: 13px; color: var(--texto-secundario); display: flex; align-items: center; justify-content: center; gap: 8px; }

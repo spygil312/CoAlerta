@@ -29,7 +29,6 @@
         status.textContent = "Selecciona Robo, Sospecha, Accidente o Incendio para iniciar una alerta.";
         status.className = "estado-envio-alerta estado-envio-info estado-emergencia-directa";
     });
-
     alertGrid.querySelectorAll("[data-emergencia]").forEach((categoryButton) => {
         categoryButton.addEventListener("click", () => startCountdown(categoryButton.dataset.emergencia));
     });
@@ -58,14 +57,12 @@
             .catch((error) => ({ error }));
         const startedAt = Date.now();
         const duration = 3000;
-
         activeTimer = window.setInterval(() => {
             const elapsed = Date.now() - startedAt;
             const remaining = Math.max(0, duration - elapsed);
             countdownNumber.textContent = String(Math.ceil(remaining / 1000));
             progress.style.width = `${Math.min(100, elapsed / duration * 100)}%`;
             if (remaining > 0) return;
-
             window.clearInterval(activeTimer);
             activeTimer = null;
             if (navigator.vibrate) navigator.vibrate([100, 50, 180]);
@@ -249,7 +246,6 @@
         try {
             const snapshot = await getDocFromServer(alertRef);
             if (!snapshot.exists()) return false;
-
             const alert = snapshot.data();
             return alert.creadorId === uid
                 && alert.tipo === "alerta_abierta"

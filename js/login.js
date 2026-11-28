@@ -14,7 +14,6 @@ document.addEventListener("DOMContentLoaded", function () {
     const passwordField = document.getElementById("password");
     const rememberCheckbox = document.getElementById("recordarme");
     const loginButton = document.getElementById("btnIniciarSesion");
-
     restoreRememberedIdentifier();
     configurePasswordVisibility();
     rememberCheckbox.addEventListener("change", function () {
@@ -25,11 +24,9 @@ document.addEventListener("DOMContentLoaded", function () {
             console.error("No se pudo borrar el correo recordado:", error);
         }
     });
-
     form.addEventListener("submit", async function (event) {
         event.preventDefault();
         clearMessage();
-
         const identifier = identifierField.value.trim().toLowerCase();
         const password = passwordField.value;
         if (!identifier || !password) {
@@ -86,7 +83,6 @@ document.addEventListener("DOMContentLoaded", function () {
             setBusy(false);
         }
     });
-
     document.getElementById("btnGoogle").addEventListener("click", async function () {
         clearMessage();
         setBusy(true, "Conectando con Google...");
@@ -137,13 +133,11 @@ document.addEventListener("DOMContentLoaded", function () {
             provider.providerId === EmailAuthProvider.PROVIDER_ID
         );
         if (hasPasswordProvider || !user.email) return "linked";
-
         const shouldLink = window.confirm(
             "Esta cuenta de Google todavía no tiene una contraseña vinculada. " +
             "¿Quieres vincular tu contraseña para poder iniciar sesión también con correo?"
         );
         if (!shouldLink) return "skipped";
-
         const password = window.prompt(
             `Ingresa la contraseña que deseas asociar con ${user.email}:`
         );

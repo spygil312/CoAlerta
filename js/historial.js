@@ -1,13 +1,8 @@
 import { signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import {
-    collection, doc, getDoc, onSnapshot, orderBy, query, Timestamp, where
+import { collection, doc, getDoc, onSnapshot, orderBy, query, Timestamp, where
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
-import {
-    configurarCierreSesion,
-    establecerTexto,
-    formatearRolVisible
-} from "./general.js?v=shared-core-20261106";
+import { configurarCierreSesion, establecerTexto, formatearRolVisible } from "./general.js?v=shared-core-20261106";
 
 document.addEventListener("DOMContentLoaded", function () {
     const tablaHistorial = document.getElementById("tablaHistorial");
@@ -210,7 +205,6 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         constraints.push(orderBy("timestamp", "desc"));
         const queryCommunity = query(collection(db, "incidentes"), ...constraints);
-
         cancelarConsultaComunidad = onSnapshot(queryCommunity, (snapshot) => {
             if (sequence !== secuenciaConsultaComunidad) return;
             incidentesComunidad = snapshot.docs
@@ -296,7 +290,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 }
             );
         });
-
         const botonLimpiar = document.getElementById("btnLimpiarFiltros");
         if (botonLimpiar) {
             botonLimpiar.addEventListener("click", function () {
@@ -319,7 +312,6 @@ document.addEventListener("DOMContentLoaded", function () {
         const fechaInicio = filtroFecha ? filtroFecha.value : "";
         const fechaFin = filtroFechaFin ? filtroFechaFin.value : "";
         let visibles = 0;
-
         alertasFilas.forEach(({ elemento, datos }) => {
             const coincideTexto = normalizarTexto(elemento.textContent).includes(texto) ||
                 normalizarTexto(datos.alerta && datos.alerta.id).includes(texto);
@@ -333,7 +325,6 @@ document.addEventListener("DOMContentLoaded", function () {
             elemento.hidden = !mostrar;
             if (mostrar) visibles++;
         });
-
         cantidadResultados.textContent = `${visibles} ${visibles === 1 ? "resultado" : "resultados"}`;
         sinResultados.classList.toggle("mostrar", visibles === 0);
     }
@@ -377,11 +368,9 @@ function crearFilaAlerta(alerta) {
     const fecha = obtenerFechaAlerta(alerta);
     const estado = obtenerEstadoAlerta(alerta.estado);
     const fila = document.createElement("tr");
-
     fila.dataset.tipo = tipoClase;
     fila.dataset.estado = estado.clase;
     fila.dataset.fecha = fecha.iso;
-
     const tipoCelda = document.createElement("td");
     const tipoContenedor = document.createElement("div");
     tipoContenedor.className = "tipo-alerta-tabla";
@@ -396,7 +385,6 @@ function crearFilaAlerta(alerta) {
     nombreAlerta.textContent = nombreTipo(tipoClase);
     tipoContenedor.append(iconoTipo, nombreAlerta);
     tipoCelda.appendChild(tipoContenedor);
-
     const ubicacionCelda = document.createElement("td");
     ubicacionCelda.className = "celda-ubicacion";
     const ubicacionIcono = document.createElement("i");
@@ -405,7 +393,6 @@ function crearFilaAlerta(alerta) {
     const ubicacionTexto = document.createElement("span");
     ubicacionTexto.textContent = ubicacionAlerta(alerta);
     ubicacionCelda.append(ubicacionIcono, ubicacionTexto);
-
     const fechaCelda = document.createElement("td");
     fechaCelda.className = "celda-fecha";
     const fechaIcono = document.createElement("i");
@@ -414,7 +401,6 @@ function crearFilaAlerta(alerta) {
     const fechaTexto = document.createElement("span");
     fechaTexto.textContent = fecha.formateada;
     fechaCelda.append(fechaIcono, fechaTexto);
-
     const horaCelda = document.createElement("td");
     horaCelda.className = "celda-hora";
     const horaIcono = document.createElement("i");
@@ -423,7 +409,6 @@ function crearFilaAlerta(alerta) {
     const horaTexto = document.createElement("span");
     horaTexto.textContent = obtenerHoraAlerta(alerta);
     horaCelda.append(horaIcono, horaTexto);
-
     const estadoCelda = document.createElement("td");
     const estadoEtiqueta = document.createElement("span");
     estadoEtiqueta.className = `estado-alerta ${estado.clase}`;
@@ -436,7 +421,6 @@ function crearFilaAlerta(alerta) {
         document.createTextNode(` ${estadoEnProceso ? "En proceso" : estado.etiqueta}`)
     );
     estadoCelda.appendChild(estadoEtiqueta);
-
     const tiempoRespuestaCelda = document.createElement("td");
     tiempoRespuestaCelda.className = "celda-tiempo-respuesta";
     const tiempoRespuesta = document.createElement("small");
@@ -448,7 +432,6 @@ function crearFilaAlerta(alerta) {
     tiempoRespuestaTexto.textContent = formatearTiempoRespuesta(alerta);
     tiempoRespuesta.append(tiempoRespuestaIcono, tiempoRespuestaTexto);
     tiempoRespuestaCelda.appendChild(tiempoRespuesta);
-
     const accionCelda = document.createElement("td");
     const botonDetalle = document.createElement("button");
     botonDetalle.type = "button";
@@ -471,16 +454,7 @@ function crearFilaAlerta(alerta) {
         }
     });
     accionCelda.appendChild(botonDetalle);
-
-    fila.append(
-        tipoCelda,
-        ubicacionCelda,
-        fechaCelda,
-        horaCelda,
-        estadoCelda,
-        tiempoRespuestaCelda,
-        accionCelda
-    );
+    fila.append( tipoCelda, ubicacionCelda, fechaCelda, horaCelda, estadoCelda, tiempoRespuestaCelda, accionCelda);
 
     return {
         elemento: fila,
@@ -502,7 +476,6 @@ function actualizarEstadisticas(filas) {
     const criticas = filas.filter(({ datos }) =>
         normalizarTexto(datos.prioridad) === "alta"
     ).length;
-
     establecerTexto("totalAlertas", total);
     establecerTexto("totalAtendidas", atendidas);
     establecerTexto("totalProceso", enProceso);
@@ -530,7 +503,6 @@ function configurarUsuario(profileOverride) {
 
     if (nombreElemento) nombreElemento.textContent = `Hola, ${primerNombre}`;
     if (rolElemento) rolElemento.textContent = formatearRolVisible(usuario);
-
     const avatar = document.getElementById("sidebarAvatarImg");
     const icono = document.getElementById("sidebarAvatarIcon");
     const foto = usuario.fotoBase64 || usuario.fotoURL || usuario.photoURL;
@@ -550,7 +522,6 @@ function configurarUsuario(profileOverride) {
 
 function configurarModal(modal) {
     if (!modal) return;
-
     const cerrar = () => {
         modal.classList.remove("mostrar");
     };
@@ -580,7 +551,6 @@ function mostrarDetalle(alerta, tipoClase, fecha, estado) {
     establecerTexto("detalleTiempoRespuesta", formatearTiempoRespuesta(alerta));
     establecerTexto("detalleReporteTexto", String(alerta.detalle || "").trim() || "Sin detalle adicional.");
     renderizarLineaTiempo(alerta);
-
     const iconoTipo = document.querySelector(".detalle-alerta-icono");
     if (iconoTipo) {
         iconoTipo.className = `detalle-alerta-icono ${tipoClase}`;
@@ -633,7 +603,6 @@ function mostrarDetalle(alerta, tipoClase, fecha, estado) {
 function renderizarLineaTiempo(alerta) {
     const lista = document.getElementById("lineaTiempoIncidente");
     if (!lista) return;
-
     const etapas = [
         ["Emisión", alerta.timestamp],
         ["Derivación", alerta.derivadaAt],
@@ -641,13 +610,11 @@ function renderizarLineaTiempo(alerta) {
         ["Arribo", alerta.enSitioAt],
         ["Cierre", alerta.closedAt]
     ];
-
     lista.replaceChildren(...etapas.map(([nombre, valor]) => {
         const elemento = document.createElement("li");
         const titulo = document.createElement("strong");
         const hora = document.createElement("time");
         const fecha = convertirFecha(valor);
-
         titulo.textContent = nombre;
         if (fecha && Number.isFinite(fecha.getTime())) {
             hora.dateTime = fecha.toISOString();
@@ -664,11 +631,9 @@ function renderizarLineaTiempo(alerta) {
 function configurarExportacion(obtenerFilas) {
     const boton = document.getElementById("btnExportar");
     if (!boton) return;
-
     boton.addEventListener("click", function () {
         const role = window.coalertaData && window.coalertaData.getRole();
         if (!["coordinador", "seguridad", "agente"].includes(role)) return;
-
         const filas = obtenerFilas();
         const visibles = filas.filter(({ elemento }) => !elemento.hidden);
         if (visibles.length === 0) {
@@ -695,7 +660,6 @@ function configurarExportacion(obtenerFilas) {
                 datos.prioridad
             ];
         });
-
         const csv = [cabecera, ...filasCsv]
             .map((fila) => fila.map(escaparCampoCsv).join(","))
             .join("\r\n");
@@ -717,7 +681,6 @@ function formatearTiempoRespuesta(alerta) {
         convertirFecha(alerta && alerta.createdAt);
     const arribo = convertirFecha(alerta && alerta.enSitioAt);
     if (!emision || !arribo || arribo < emision) return "No disponible";
-
     const totalSegundos = Math.floor((arribo.getTime() - emision.getTime()) / 1000);
     const horas = Math.floor(totalSegundos / 3600);
     const minutos = Math.floor((totalSegundos % 3600) / 60);

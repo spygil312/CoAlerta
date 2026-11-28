@@ -2,7 +2,6 @@
     let solicitudEnCurso = null;
     const claveUbicacion = "coalerta_ubicacion_sesion";
     const vigenciaMs = 15 * 60 * 1000;
-
     window.coalertaObtenerUbicacionActual = function (forzarActualizacion) {
         if (solicitudEnCurso) return solicitudEnCurso;
 
@@ -62,17 +61,14 @@
 
         return solicitudEnCurso;
     };
-
     window.coalertaEsEntornoLocal = function () {
         return ["localhost", "127.0.0.1"].includes(window.location.hostname);
     };
-
     window.coalertaFormatearDistancia = function (metros) {
         return metros < 1000
             ? `${Math.round(metros)} m`
             : `${(metros / 1000).toLocaleString("es", { maximumFractionDigits: 1 })} km`;
     };
-
     window.coalertaGeocodificarInverso = async function (latitud, longitud) {
         const params = new URLSearchParams({
             format: "jsonv2",
@@ -114,7 +110,6 @@
         }
 
         if (direccion) return direccion;
-
         const photonController = new AbortController();
         const photonTimeout = window.setTimeout(() => photonController.abort(), 4000);
         try {

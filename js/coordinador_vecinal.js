@@ -1,9 +1,6 @@
 import { signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { auth } from "./firebase-config.js?v=spark-direct-firestore-1";
-import {
-    configurarCierreSesion,
-    escapeHtml
-} from "./general.js?v=shared-core-20261106";
+import { configurarCierreSesion, escapeHtml } from "./general.js?v=shared-core-20261106";
 
 document.addEventListener("DOMContentLoaded", function () {
     const data = window.coalertaData;
@@ -37,7 +34,6 @@ document.addEventListener("DOMContentLoaded", function () {
     let initialized = false;
     let knownIncidentIds = null;
     let auditExpiryTimer = null;
-
     configurarCierreSesion({
         auth,
         signOut,
@@ -147,13 +143,11 @@ document.addEventListener("DOMContentLoaded", function () {
         const avatar = document.getElementById("sidebarAvatarImg");
         const avatarIcon = document.getElementById("sidebarAvatarIcon");
         const photo = account.fotoBase64 || account.fotoURL || account.photoURL;
-
         nameElement.textContent = `Hola, ${name.trim().split(/\s+/)[0]}`;
         roleElement.textContent = ["administrador", "admin"].includes(activeRole)
             ? "Administrador"
             : "Coordinador vecinal";
         if (!photo) return;
-
         avatar.onerror = function () {
             avatar.hidden = true;
             avatarIcon.hidden = false;
@@ -291,7 +285,6 @@ document.addEventListener("DOMContentLoaded", function () {
         article.className = "central-alerta";
         article.dataset.id = String(alert.id);
         article.dataset.categoria = data.normalizeCategory(alert.tipo);
-
         const header = document.createElement("div");
         header.className = "central-alerta-cabecera";
         const identity = document.createElement("div");
@@ -311,7 +304,6 @@ document.addEventListener("DOMContentLoaded", function () {
         state.className = `central-estado${alert.estado === "Auxilio en camino" ? " central-estado-en-camino" : ""}`;
         state.textContent = alert.estado || "Pendiente";
         header.append(identity, state);
-
         const meta = document.createElement("div");
         meta.className = "central-alerta-meta";
         meta.textContent = `${formatDate(alert.timestamp)} · ${alert.id}`;
@@ -677,7 +669,6 @@ document.addEventListener("DOMContentLoaded", function () {
         const earliestStart = new Date(Date.now() + 120000);
         earliestStart.setSeconds(0, 0);
         startInput.min = toLocalDateTimeValue(earliestStart);
-
         const start = new Date(startInput.value);
         if (!startInput.value || !Number.isFinite(start.getTime())) {
             endInput.removeAttribute("min");
@@ -1128,7 +1119,6 @@ document.addEventListener("DOMContentLoaded", function () {
     function toggleNightTheme() {
         mapNightMode = !mapNightMode;
         map.getContainer().classList.toggle("mapa-nocturno", mapNightMode);
-
         const button = document.getElementById("btnTemaCentral");
         const icon = button.querySelector("i");
         button.setAttribute("aria-pressed", String(mapNightMode));

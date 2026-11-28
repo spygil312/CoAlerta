@@ -13,11 +13,9 @@ if (btnMenu && menuMobile) {
         btnMenu.setAttribute("aria-expanded", String(abierto));
         btnMenu.setAttribute("aria-label", abierto ? "Cerrar menú" : "Abrir menú");
     });
-
     menuMobile.querySelectorAll("a").forEach(function (enlace) {
         enlace.addEventListener("click", cerrarMenu);
     });
-
     document.addEventListener("keydown", function (evento) {
         if (evento.key === "Escape") {
             cerrarMenu();

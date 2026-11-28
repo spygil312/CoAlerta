@@ -1,7 +1,5 @@
-import {
-    collection, deleteDoc, doc, getDoc, getDocs, getDocsFromServer, limit, onSnapshot,
-    orderBy, query, runTransaction, serverTimestamp, setDoc, Timestamp, updateDoc, where,
-    writeBatch
+import { collection, deleteDoc, doc, getDoc, getDocs, getDocsFromServer, limit, onSnapshot,
+    orderBy, query, runTransaction, serverTimestamp, setDoc, Timestamp, updateDoc, where, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
@@ -185,7 +183,6 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
             : null;
         const local = readLocalPreferences(uid);
         const preferences = pending || remote || local || {};
-
         profile.preferencias = preferences;
         dispatch("coalerta:preferencias-cargadas", preferences);
 
@@ -253,7 +250,6 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
         if (state.operationalDataReady || !isOperationalPage()) return;
         const communityId = String(state.profile && state.profile.comunidadId || "");
         if (!state.isAdmin && !communityId.trim()) return;
-
         state.operationalDataReady = true;
         watch(
             state.isAdmin
@@ -298,7 +294,6 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
         if (!state.isAdmin && !["coordinador", "agente", "seguridad"].includes(state.role)) return;
         const communityId = String(state.profile && state.profile.comunidadId || "").trim();
         if (!state.isAdmin && !communityId) return;
-
         state.patrolDataReady = true;
         watch(
             state.isAdmin
@@ -940,7 +935,6 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
             throw new Error("El navegador no proporcionó una precisión GPS válida.");
         }
         const direccion = await obtenerDireccionInversa(latitud, longitud);
-
         const coordinatorNeedsCommunity = effectiveRole() === "coordinador" && !state.profile.comunidadId;
         const communityId = effectiveRole() === "coordinador"
             ? await ensureCoordinatorCommunity(user, state.profile)
@@ -1182,7 +1176,6 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
         };
         if (!rolesByAction[action]) throw new TypeError("La acción solicitada no es válida.");
         requireRole(rolesByAction[action]);
-
         const id = String(incidentId || "").trim();
         if (!id || id.length > 128) throw new TypeError("El identificador del incidente no es válido.");
         const incidentRef = doc(db, "incidentes", id);
@@ -1190,7 +1183,6 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
         const ratingRef = doc(db, "incidentes", id, "calificaciones", user.uid);
         const userAlertRef = doc(db, "usuarios", user.uid, "alertas", id);
         const auditLogRef = doc(collection(db, "logs"));
-
         let patrolRef = null;
         let patrolSnapshot = null;
         if (["dispatch", "onsite", "close", "discard"].includes(action)) {
@@ -1700,7 +1692,6 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
         const syncKey = `${uid}:${communityId}`;
         const existingSync = communityIncidentSyncs.get(syncKey);
         if (existingSync) return existingSync;
-
         const sync = (async () => {
             const snapshot = await getDocs(query(
                 collection(db, "incidentes"),
@@ -1809,7 +1800,6 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
     async function ensureCoordinatorCommunity(user, profile) {
         let communityId = String(profile.comunidadId || "").trim();
         if (communityId) return communityId;
-
         const profileRef = doc(db, "usuarios", user.uid);
         await runTransaction(db, async (transaction) => {
             const snapshot = await transaction.get(profileRef);
@@ -1941,7 +1931,6 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
             );
         }
         if (!communityId) throw new Error("Tu cuenta no pertenece a una comunidad.");
-
         const profileRef = doc(db, "usuarios", user.uid);
         const currentProfile = await getDoc(profileRef);
         if (!currentProfile.exists() || currentProfile.get("activo") !== true ||
@@ -2013,7 +2002,6 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
                 ultimaUbicacion: null
             });
         });
-
         state.profile = {
             ...state.profile,
             comunidadId: null,
@@ -2163,7 +2151,6 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
             ]);
             if (memberSnapshot.exists()) await deleteDoc(memberRef);
             if (contactsSnapshot.exists()) await deleteDoc(contactsRef);
-
             const announcements = await getDocs(query(
                 collection(db, "comunidades", communityId, "anuncios"),
                 where("autorUid", "==", user.uid)
@@ -2296,7 +2283,6 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
             where("usuarioId", "==", user.uid)
         ));
         await deleteAccountDocuments(outgoingMessages.docs);
-
         const userCollections = ["alertas", "alertas_leidas", "avisos_leidos"];
         for (const collectionName of userCollections) {
             const documents = await getDocs(collection(profileRef, collectionName));
@@ -2402,7 +2388,6 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
         getCommunityMemberEmergencyContacts,
         deleteAccount
     };
-
     const cachedProfile = (() => {
         try {
             return JSON.parse(localStorage.getItem("coalerta_usuario") || "null");
@@ -2420,6 +2405,5 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
     } else {
         updateRoleNavigation(null, null, false);
     }
-
     onAuthStateChanged(auth, startForUser);
 })();

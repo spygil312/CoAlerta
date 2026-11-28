@@ -1,14 +1,9 @@
-import {
-    EmailAuthProvider, GoogleAuthProvider, onAuthStateChanged, reauthenticateWithCredential,
-    reauthenticateWithPopup, sendEmailVerification, signOut, updateEmail, updateProfile, updatePassword,
-    deleteUser
+import { EmailAuthProvider, GoogleAuthProvider, onAuthStateChanged, reauthenticateWithCredential,
+    reauthenticateWithPopup, sendEmailVerification, signOut, updateEmail, updateProfile, updatePassword, deleteUser
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
-import {
-    configurarCierreSesion,
-    establecerTexto
-} from "./general.js?v=shared-core-20261106";
+import { configurarCierreSesion, establecerTexto } from "./general.js?v=shared-core-20261106";
 
 document.addEventListener("DOMContentLoaded", function () {
     const formPerfil = document.getElementById("formPerfil");
@@ -24,7 +19,6 @@ document.addEventListener("DOMContentLoaded", function () {
     const inputFoto = document.getElementById("inputFoto");
     const botonesMostrarPassword = document.querySelectorAll(".ver-password");
     const usuarioGuardado = leerUsuarioGuardado();
-
     mostrarUsuario(usuarioGuardado);
     configurarPreferencias();
     configurarMostrarContrasenas();
@@ -70,7 +64,6 @@ document.addEventListener("DOMContentLoaded", function () {
             this.value = this.value.replace(/\D/g, "").slice(0, id === "dniDesactivacion" ? 8 : 9);
         });
     });
-
     onAuthStateChanged(auth, cargarUsuarioAutenticado);
 
     function leerUsuarioGuardado() {
@@ -126,7 +119,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 uid: usuarioAuth.uid,
                 correo: usuarioAuth.email || datosFirestore.correo || ""
             };
-
             guardarUsuarioEnNavegador(usuarioActualizado);
             mostrarUsuario(usuarioActualizado);
 
@@ -171,7 +163,6 @@ document.addEventListener("DOMContentLoaded", function () {
         establecerRol(rol);
         mostrarContactosEmergencia(usuario.contactosEmergencia);
         establecerValor("dniDesactivacion", usuario.dni || "");
-
         const imagen = usuario.fotoBase64 || usuario.fotoURL || usuario.photoURL;
         if (imagen) mostrarFoto(imagen);
     }
@@ -332,7 +323,6 @@ document.addEventListener("DOMContentLoaded", function () {
     async function guardarPerfil(evento) {
         evento.preventDefault();
         limpiarMensaje(mensajePerfil);
-
         const nombres = document.getElementById("nombres").value.trim();
         const apellidos = document.getElementById("apellidos").value.trim();
         const correo = document.getElementById("correo").value.trim();
@@ -380,7 +370,6 @@ document.addEventListener("DOMContentLoaded", function () {
         let correoAuthActualizado = false;
         let falloVerificacionCorreo = false;
         let falloSincronizacionContactoComunidad = false;
-
         establecerCargando(formPerfil, true);
         try {
             if (usuarioAuth && correo !== correoAnterior) {
@@ -568,7 +557,6 @@ document.addEventListener("DOMContentLoaded", function () {
             const idCampo = boton.dataset.password || ids[indice];
             const campo = document.getElementById(idCampo);
             if (!campo) return;
-
             boton.dataset.password = idCampo;
             boton.addEventListener("click", function () {
                 const mostrar = campo.type === "password";
@@ -596,7 +584,6 @@ document.addEventListener("DOMContentLoaded", function () {
     async function cambiarContrasena(evento) {
         evento.preventDefault();
         limpiarMensaje(mensajePassword);
-
         const actual = document.getElementById("passwordActual").value;
         const nueva = document.getElementById("passwordNueva").value;
         const confirmar = document.getElementById("passwordConfirmar").value;
@@ -667,7 +654,6 @@ document.addEventListener("DOMContentLoaded", function () {
         };
         const uid = typeof auth !== "undefined" && auth.currentUser ? auth.currentUser.uid : "";
         const guardadas = uid ? leerPreferenciasLocales(uid) : {};
-
         const aplicarPreferencias = function (preferencias) {
             Object.entries(controles).forEach(([clave, control]) => {
                 if (control && typeof preferencias[clave] === "boolean") {
@@ -681,7 +667,6 @@ document.addEventListener("DOMContentLoaded", function () {
         const preferenciasSinTema = { ...guardadas };
         delete preferenciasSinTema.temaOscuro;
         aplicarPreferencias(preferenciasSinTema);
-
         Object.entries(controles).forEach(([clave, control]) => {
             if (!control) return;
             control.setAttribute("aria-label", {
@@ -720,7 +705,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 }
             });
         });
-
         const probarSonido = document.getElementById("probarSonidoEmergencia");
         const estadoSonido = document.getElementById("estadoSonidoEmergencia");
         if (probarSonido) {

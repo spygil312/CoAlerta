@@ -53,7 +53,6 @@ window.coalertaSonidoEmergencia = (function () {
         const context = getAudioContext();
         if (!context) return false;
         if (context.state !== "running" && !(await unlock())) return false;
-
         const startAt = context.currentTime + 0.02;
         [880, 660].forEach((frequency, index) => {
             const start = startAt + index * 0.2;
@@ -116,7 +115,6 @@ document.addEventListener("DOMContentLoaded", function () {
     const menu = document.getElementById("menuNotificaciones");
     const lista = document.getElementById("notificacionesLista");
     if (!boton || !contador || !menu || !lista) return;
-
     let ubicacionActual = null;
     let solicitudUbicacionEnCurso = false;
     let intentoUbicacionRealizado = false;
@@ -130,7 +128,6 @@ document.addEventListener("DOMContentLoaded", function () {
     contador.hidden = true;
     contador.textContent = "";
     lista.textContent = "Abre las notificaciones para consultar alertas cercanas usando tu ubicación.";
-
     boton.addEventListener("click", function (evento) {
         evento.stopPropagation();
         menu.hidden = !menu.hidden;
@@ -139,28 +136,24 @@ document.addEventListener("DOMContentLoaded", function () {
             cargarUbicacion(false);
         }
     });
-
     document.addEventListener("pointerdown", () => {
         if (soundEnabled()) window.coalertaSonidoEmergencia.unlock();
     }, { once: true });
     document.addEventListener("keydown", () => {
         if (soundEnabled()) window.coalertaSonidoEmergencia.unlock();
     }, { once: true });
-
     document.addEventListener("click", function (evento) {
         if (!boton.contains(evento.target) && !menu.contains(evento.target)) {
             menu.hidden = true;
             boton.setAttribute("aria-expanded", "false");
         }
     });
-
     document.addEventListener("keydown", function (evento) {
         if (evento.key === "Escape") {
             menu.hidden = true;
             boton.setAttribute("aria-expanded", "false");
         }
     });
-
     window.addEventListener("coalerta:alertas-actualizadas", function () {
         detectarAlertasNuevas();
         actualizarNotificaciones();
@@ -212,7 +205,6 @@ document.addEventListener("DOMContentLoaded", function () {
             lista.textContent = error.message || "No se pudo guardar que la alerta fue leída.";
         });
     });
-
     actualizarNotificaciones();
     if (typeof window.coalertaObtenerUbicacionActual !== "function") {
         lista.textContent = "No se pudo iniciar el servicio de ubicación.";
@@ -312,7 +304,6 @@ document.addEventListener("DOMContentLoaded", function () {
             );
         }
         const total = pendientes.length;
-
         contador.hidden = total === 0;
         contador.textContent = total > 99 ? "99+" : String(total);
         boton.setAttribute("aria-label", total

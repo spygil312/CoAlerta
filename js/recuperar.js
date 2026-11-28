@@ -6,7 +6,6 @@ document.addEventListener("DOMContentLoaded", function () {
     const emailField = document.getElementById("correoRecuperacion");
     const button = document.getElementById("btnRecuperar");
     const message = document.getElementById("mensajeRecuperar");
-
     form.addEventListener("submit", async function (event) {
         event.preventDefault();
         const correo = emailField.value.trim().toLowerCase();

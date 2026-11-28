@@ -1,6 +1,5 @@
 document.addEventListener("DOMContentLoaded", function () {
     const maxReportGpsAccuracyMetros = 1000000;
-    const modal = document.getElementById("modalEmergencia");
     const grid = document.querySelector(".modal-alertas-grid");
     const countdown = document.getElementById("confirmacionCuentaRegresiva");
     const countdownNumber = document.getElementById("cuentaRegresivaNumero");
@@ -59,7 +58,6 @@ document.addEventListener("DOMContentLoaded", function () {
             "No se pudieron cargar las alertas. Inténtalo más tarde."
         ));
     });
-
     document.querySelectorAll(".modal-alerta-btn").forEach((button) => {
         button.addEventListener("click", function () {
             unlockEmergencyAudio();
@@ -162,7 +160,6 @@ document.addEventListener("DOMContentLoaded", function () {
         if (countdownNumber) countdownNumber.textContent = "3";
         if (progress) progress.style.width = "0%";
         if (detailInput) detailInput.disabled = true;
-
         const positionResult = new Promise((resolve) => {
             navigator.geolocation.getCurrentPosition(
                 (position) => resolve({ position }),
@@ -412,14 +409,12 @@ document.addEventListener("DOMContentLoaded", function () {
             : alert.tipo;
         article.dataset.tipo = normalizeType(alertType);
         article.dataset.id = String(alert.id);
-
         const icon = document.createElement("div");
         icon.className = `alerta-item-icono ${typeClass(alertType)}`;
         const iconElement = document.createElement("i");
         iconElement.className = `fa-solid ${typeIcon(alertType)}`;
         iconElement.setAttribute("aria-hidden", "true");
         icon.append(iconElement);
-
         const info = document.createElement("div");
         info.className = "alerta-item-info";
         const top = document.createElement("div");
@@ -443,7 +438,6 @@ document.addEventListener("DOMContentLoaded", function () {
         else if (alert.estado === "Derivada a Central") state.className = "prioridad estado-derivada";
         state.textContent = alert.estado || "Pendiente";
         footer.append(state);
-
         const latitude = alert.latitudPublica ?? alert.latitud;
         const longitude = alert.longitudPublica ?? alert.longitud;
         if (Number.isFinite(Number(latitude)) && Number.isFinite(Number(longitude))) {

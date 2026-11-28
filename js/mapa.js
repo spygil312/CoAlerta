@@ -1,12 +1,6 @@
-import {
-    onAuthStateChanged, signOut
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { auth } from "./firebase-config.js?v=spark-direct-firestore-1";
-import {
-    configurarCierreSesion,
-    escapeHtml,
-    formatearRolVisible
-} from "./general.js?v=shared-core-20261106";
+import { configurarCierreSesion, escapeHtml, formatearRolVisible } from "./general.js?v=shared-core-20261106";
 
 let ubicacionActualMapa = null;
 let comunidadActualMapa = null;
@@ -77,7 +71,6 @@ document.addEventListener("DOMContentLoaded", function () {
         targetLatitude >= -90 && targetLatitude <= 90 &&
         targetLongitude >= -180 && targetLongitude <= 180) {
         window.map.setView([targetLatitude, targetLongitude], 17);
-        // Enlaces desde "Mi comunidad": ?lat=..&lng=..&tipo=..&nombre=..
         lugarObjetivo = {
             latitud: targetLatitude,
             longitud: targetLongitude,
@@ -185,10 +178,8 @@ document.addEventListener("DOMContentLoaded", function () {
             );
         }
     }, 30000);
-
     const botonUbicacion = document.getElementById("btnMiUbicacion");
     if (botonUbicacion) botonUbicacion.addEventListener("click", mostrarMiUbicacion);
-
     actualizarContadorMapa();
     actualizarEstadoFirebaseMapa("connecting");
     window.setTimeout(() => window.map && window.map.invalidateSize(), 300);
@@ -208,7 +199,6 @@ function configurarConsultaAlertasMapa(profile) {
     const context = communityId || "public";
     if (context === comunidadActualMapa && solicitudUbicacionMapa) return;
     comunidadActualMapa = context;
-
     solicitarUbicacionMapa();
     actualizarMarcadoresMapa();
 }
@@ -335,16 +325,13 @@ function crearMarcadorLugar(lugar) {
     return marcador;
 }
 
-// Dibuja los lugares cercanos guardados desde "Mi comunidad" y enfoca el
-// lugar seleccionado cuando se llega desde un enlace de esa página.
 function mostrarLugaresCercanosEnMapa(capa, lugarObjetivo) {
     if (!capa) return;
     capa.clearLayers();
-    const margen = 0.0002; // ≈ 22 m
+    const margen = 0.0002;
     let elegido = null;
     let menorDistancia = Infinity;
     const marcadores = [];
-
     leerLugaresGuardados().forEach((lugar) => {
         const marcador = crearMarcadorLugar(lugar);
         marcadores.push(marcador);
@@ -352,7 +339,6 @@ function mostrarLugaresCercanosEnMapa(capa, lugarObjetivo) {
         const dLat = Math.abs(lugar.latitud - lugarObjetivo.latitud);
         const dLng = Math.abs(lugar.longitud - lugarObjetivo.longitud);
         if (dLat > margen || dLng > margen) return;
-        // El nombre coincidente tiene prioridad; si no, el más cercano.
         const distancia = dLat + dLng - (lugar.nombre === lugarObjetivo.nombre ? 1 : 0);
         if (distancia < menorDistancia) {
             menorDistancia = distancia;
@@ -360,8 +346,6 @@ function mostrarLugaresCercanosEnMapa(capa, lugarObjetivo) {
         }
     });
 
-    // Lugar seleccionado que no se guarda de forma permanente (bomberos, municipalidad)
-    // o cuya lista ya venció: se muestra solo ese marcador.
     if (!elegido && lugarObjetivo && lugarObjetivo.tipo) {
         elegido = crearMarcadorLugar({
             nombre: lugarObjetivo.nombre || "Lugar seleccionado",
@@ -394,7 +378,6 @@ function configurarPanelAlertasMovil() {
     const toggle = document.getElementById("btnExpandirAlertas");
     const mapGrid = document.querySelector(".mapa-principal-grid");
     if (!panel || !toggle || !mapGrid) return;
-
     const updatePanelPosition = () => {
         document.body.style.setProperty(
             "--alertas-panel-height",
@@ -482,7 +465,6 @@ function crearIconoMapa(icono, color) {
 function obtenerIconoLugarMapa(tipo) {
     const categoria = DATOS_ICONO_LUGAR_MAPA[tipo] ? tipo : "lugar";
     if (ICONOS_LUGAR_MAPA.has(categoria)) return ICONOS_LUGAR_MAPA.get(categoria);
-
     const { color, dibujo } = DATOS_ICONO_LUGAR_MAPA[categoria];
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 32 40"><path d="${SILUETA_PIN_LUGAR_MAPA}" fill="${color}" stroke="#ffffff" stroke-width="2.5" stroke-linejoin="round"/>${dibujo}</svg>`;
     const icono = L.icon({
@@ -522,7 +504,6 @@ function agregarMarcadorAlerta(alerta) {
     const marcador = L.marker([latitud, longitud], {
         icon: obtenerIconoPorTipo(tipo)
     }).addTo(window.grupoMarcadoresAlertas);
-
     marcador.bindPopup(`
         <div class="popup-coalerta">
             <strong>${escapeHtml(tipo)}</strong><br>
@@ -718,11 +699,9 @@ window.actualizarMapa = function () {
 function configurarCentradoAlertas() {
     const contenedor = document.getElementById("alertasLista");
     if (!contenedor) return;
-
     contenedor.addEventListener("click", function (evento) {
         const boton = evento.target.closest(".btn-ver-mapa");
         if (!boton) return;
-
         const latitud = Number(boton.dataset.lat);
         const longitud = Number(boton.dataset.lng);
         if (Number.isFinite(latitud) && Number.isFinite(longitud)) {
@@ -735,7 +714,6 @@ function configurarFiltrosMapa() {
     const boton = document.getElementById("btnFiltros");
     const panel = document.getElementById("panelFiltros");
     if (!boton || !panel) return;
-
     boton.addEventListener("click", function () {
         panel.hidden = !panel.hidden;
         boton.setAttribute("aria-expanded", String(!panel.hidden));
@@ -743,7 +721,6 @@ function configurarFiltrosMapa() {
     panel.querySelectorAll('input[type="checkbox"]').forEach((control) => {
         control.addEventListener("change", aplicarFiltrosMapa);
     });
-
     const listaAlertas = document.getElementById("alertasLista");
     if (listaAlertas && typeof MutationObserver !== "undefined") {
         const observer = new MutationObserver(aplicarFiltrosMapa);
@@ -754,12 +731,10 @@ function configurarFiltrosMapa() {
 function aplicarFiltrosMapa() {
     const panel = document.getElementById("panelFiltros");
     if (!panel) return;
-
     const seleccionados = new Set(
         Array.from(panel.querySelectorAll('input[type="checkbox"]:checked'))
             .map((control) => control.value)
     );
-
     const filtroTiempo = document.getElementById("filtroTiempoMapa");
     const periodo = filtroTiempo ? filtroTiempo.value : "all";
     (window.marcadoresAlertas || []).forEach(({ marcador, tipo, timestamp }) => {
@@ -777,7 +752,6 @@ function aplicarFiltrosMapa() {
             window.grupoMarcadoresAlertas.removeLayer(marcador);
         }
     });
-
     let records = [];
     try {
         records = JSON.parse(localStorage.getItem("coalertaAlertas") || "[]");

@@ -1,9 +1,8 @@
-import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import {
-    collection, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query,
-    runTransaction, serverTimestamp, Timestamp, where
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { collection, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query,
+    runTransaction, serverTimestamp, Timestamp, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
+import { configurarCierreSesion } from "./general.js?v=shared-core-20261106";
 
 const ADMIN_EMAIL = "coalerta@gmail.com";
 const DEFAULT_COMMUNITY_ID = "comunidad_general_1";
@@ -31,6 +30,13 @@ let adminClaimVerified = false;
 let securityStaff = [];
 let units = [];
 let dailyIncidents = [];
+
+configurarCierreSesion({
+    auth,
+    signOut,
+    confirmationMessage: "¿Seguro que deseas cerrar sesión?",
+    clearCachedSession: true
+});
 
 if (aviso && panel && lista && cantidad && botonActualizar) {
     onAuthStateChanged(auth, async (user) => {
@@ -120,7 +126,6 @@ if (aviso && panel && lista && cantidad && botonActualizar) {
             setNotice(error.message || getErrorMessage(error), "error");
         }
     });
-
     botonActualizar.addEventListener("click", loadRequests);
     if (botonInicializarUnidades) {
         botonInicializarUnidades.addEventListener("click", initializeUnits);
@@ -144,7 +149,6 @@ function loadDailySla() {
     if (!adminClaimVerified || !auth.currentUser || !slaPanel || !slaAverage ||
         !slaSampleCount || !slaCommunities || !slaStatus) return;
     if (stopWatchingSla) stopWatchingSla();
-
     const now = new Date();
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const startOfNextDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
@@ -255,7 +259,6 @@ function loadRequests() {
     botonActualizar.disabled = true;
     setNotice("Sincronizando solicitudes pendientes…");
     lista.replaceChildren();
-
     stopWatchingRequests = onSnapshot(query(
         collection(db, "usuarios"),
         where("estadoSolicitudRol", "==", "pendiente")
@@ -292,7 +295,6 @@ function loadUnitAssignments() {
     if (stopWatchingSecurityStaff) stopWatchingSecurityStaff();
     if (stopWatchingUnits) stopWatchingUnits();
     if (estadoUnidades) estadoUnidades.textContent = "Cargando unidades y personal aprobado…";
-
     stopWatchingSecurityStaff = onSnapshot(query(
         collection(db, "usuarios"),
         where("rol", "==", "seguridad")
@@ -307,7 +309,6 @@ function loadUnitAssignments() {
         console.error("No se pudo cargar el personal de seguridad:", error);
         if (estadoUnidades) estadoUnidades.textContent = getErrorMessage(error);
     });
-
     stopWatchingUnits = onSnapshot(collection(db, "unidades"), (snapshot) => {
         units = snapshot.docs
             .map((unit) => ({ id: unit.id, ...unit.data() }))
@@ -357,7 +358,6 @@ async function initializeUnits() {
             }
             assignedUnits.set(assignedId, profile.id);
         });
-
         stage = "leer el inventario de unidades";
         const unitsSnapshot = await getDocs(collection(db, "unidades"));
         const existingIds = new Set(unitsSnapshot.docs.map((unit) => unit.id));
@@ -423,7 +423,6 @@ function createUnitAssignmentCard(profile) {
     assignment.className = "administracion-rol";
     assignment.textContent = currentUnit ? `Unidad asignada: ${currentUnit.id}` : "Sin unidad asignada";
     details.append(name, email, assignment);
-
     const actions = document.createElement("div");
     actions.className = "administracion-asignar-acciones";
     const select = document.createElement("select");
@@ -514,7 +513,6 @@ function createRequestCard(request) {
     card.className = "administracion-solicitud";
     const details = document.createElement("div");
     details.className = "administracion-solicitud-datos";
-
     const name = document.createElement("h3");
     name.textContent = request.nombre || [request.nombres, request.apellidos].filter(Boolean).join(" ") || "Usuario";
     const email = document.createElement("p");
@@ -525,7 +523,6 @@ function createRequestCard(request) {
         ? "Coordinador vecinal"
         : "Personal de seguridad";
     details.append(name, email, role);
-
     const actions = document.createElement("div");
     actions.className = "administracion-acciones";
     actions.append(

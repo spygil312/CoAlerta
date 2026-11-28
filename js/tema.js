@@ -103,7 +103,6 @@
         const link = event.target.closest(".sidebar-menu a[href]");
         if (!link || link.hidden || link.getAttribute("aria-current") === "page") return;
         if (event.relatedTarget && link.contains(event.relatedTarget)) return;
-
         const target = new URL(link.href, window.location.href);
         if (target.origin !== window.location.origin ||
             !target.pathname.startsWith("/pages/") ||

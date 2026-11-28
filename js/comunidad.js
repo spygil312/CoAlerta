@@ -1,13 +1,7 @@
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import {
-    collection,
-    onSnapshot
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
-import {
-    configurarCierreSesion as configurarCierreSesionCompartido,
-    formatearRolVisible
-} from "./general.js?v=shared-core-20261106";
+import { configurarCierreSesion as configurarCierreSesionCompartido, formatearRolVisible } from "./general.js?v=shared-core-20261106";
 
 let usuarioActual = null;
 let ubicacionCercanaActual = null;
@@ -147,7 +141,6 @@ document.addEventListener('DOMContentLoaded', () => {
             );
         }
     });
-
     Object.assign(window, {
         abrirModal,
         cerrarModal,
@@ -155,7 +148,6 @@ document.addEventListener('DOMContentLoaded', () => {
         copiarCodigo,
         procesarUnion
     });
-
     onAuthStateChanged(auth, (user) => {
         if (!user) {
             usuarioActual = null;
@@ -269,7 +261,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     window.coalertaRenderizarAvisosOficiales = renderizarAvisosOficiales;
-
     let solicitudUbicacionActual = 0;
 
     function configurarUbicacionCercana() {
@@ -457,7 +448,6 @@ document.addEventListener('DOMContentLoaded', () => {
             longitud - deltaLongitud, latitud + deltaLatitud,
             longitud + deltaLongitud, latitud - deltaLatitud
         ].join(',');
-
         const elementos = [];
         let exitosas = 0;
         for (let i = 0; i < CATEGORIAS_NOMINATIM.length; i += 1) {
@@ -501,7 +491,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function consultarOpenStreetMap(latitud, longitud) {
         const claveCache = `coalerta_lugares_osm:${latitud.toFixed(3)}:${longitud.toFixed(3)}`;
-
         const cacheVigente = leerCacheLugares(claveCache, false);
         if (cacheVigente) return cacheVigente;
 
@@ -548,14 +537,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!respuesta.ok) throw new Error(`Geocodificador respondió con estado ${respuesta.status}.`);
             const datos = await respuesta.json();
             if (solicitud !== solicitudUbicacionActual) return;
-
             const direccion = datos.address || {};
             const zona = direccion.neighbourhood || direccion.suburb || direccion.city_district ||
                 direccion.city || direccion.town || direccion.village || direccion.county ||
                 direccion.state || '';
             const nombreArea = zona || direccion.country || '';
             if (!nombreArea) return;
-
             const titulo = document.getElementById('tituloAreaCercana');
             const resumen = document.getElementById('resumenUbicacion');
             if (titulo) titulo.textContent = `Lugares cercanos a ${nombreArea}`;
@@ -569,7 +556,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const servicios = [];
         const lugaresImportantes = [];
         const vistos = new Set();
-
         elementos.forEach((elemento) => {
             const etiquetas = elemento.tags || {};
             const coordenadas = elemento.center || elemento;
@@ -578,11 +564,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
             const distancia = distanciaEnMetros(latitud, longitud, lat, lon);
             if (distancia > 5000) return;
-
             const llave = `${elemento.type}/${elemento.id}`;
             if (vistos.has(llave)) return;
             vistos.add(llave);
-
             const nombre = etiquetas.name || etiquetas['name:es'] || etiquetas.operator ||
                 etiquetas.brand || 'Lugar sin nombre registrado';
             const detalle = {
@@ -599,10 +583,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 lugaresImportantes.push(detalle);
             }
         });
-
         servicios.sort((a, b) => a.distancia - b.distancia);
         lugaresImportantes.sort((a, b) => a.distancia - b.distancia);
-
         lugaresServiciosOpenStreetMap = servicios;
         lugaresImportantesOpenStreetMap = lugaresImportantes;
         guardarLugaresParaMapa([...servicios, ...lugaresImportantes]);
@@ -736,7 +718,6 @@ document.addEventListener('DOMContentLoaded', () => {
             iconoI.className = `fa-solid ${obtenerIconoLugar(elemento.tipo)}`;
             iconoI.setAttribute('aria-hidden', 'true');
             icono.appendChild(iconoI);
-
             const info = document.createElement('div');
             info.className = tipoLista === 'servicio' ? 'autoridad-info' : 'lugar-info';
             const titulo = document.createElement('h4');
@@ -751,7 +732,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? `${elemento.esPersonal ? 'Personal activo' : etiquetaTipoLugar(elemento.tipo)} · ${detalleDistancia}`
                 : etiquetaTipoLugar(elemento.tipo);
             info.append(titulo, descripcion);
-
             const tieneCoordenadas = Number.isFinite(elemento.latitud) &&
                 Number.isFinite(elemento.longitud);
             if (!tieneCoordenadas) {
@@ -760,7 +740,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             const enlace = document.createElement('a');
             enlace.className = tipoLista === 'servicio' ? 'enlace-lugar-cercano' : 'icono-flecha';
-            // Se abre en el panel de mapa de CoAlerta (misma pestaña), no en OpenStreetMap.
             enlace.href = crearEnlaceMapa(elemento);
             enlace.setAttribute('aria-label', elemento.esPersonal
                 ? `Ver la ubicación compartida de ${elemento.nombre} en el mapa`
@@ -899,14 +878,12 @@ function cargarVecinosEnTiempoReal() {
 function cargarAnunciosEnTiempoReal() {
     const contenedor = document.getElementById('contenedor-anuncios');
     if (!contenedor || !usuarioActual || !usuarioActual.uid || !usuarioActual.comunidadId) return;
-
     const uid = usuarioActual.uid;
     const communityId = usuarioActual.comunidadId;
     if (stopWatchingAnnouncements &&
         watchingAnnouncementsUid === uid &&
         watchingAnnouncementsCommunityId === communityId) return;
     if (stopWatchingAnnouncements) stopWatchingAnnouncements();
-
     watchingAnnouncementsUid = uid;
     watchingAnnouncementsCommunityId = communityId;
     const anunciosRef = collection(db, "comunidades", communityId, "anuncios");
@@ -971,7 +948,6 @@ function mostrarListaCompleta(clave) {
     const contenido = document.getElementById('modal-lista-contenido');
     const titulo = document.getElementById('modal-lista-titulo');
     if (!lista || !configuracion || !modal || !contenido || !titulo) return;
-
     titulo.textContent = `${configuracion.titulo} (${lista.elementos.length})`;
     contenido.replaceChildren(...lista.elementos.map(lista.crearElemento));
     modal.classList.add('activo');
@@ -990,7 +966,6 @@ function crearFilaMiembro(vecino) {
         cerrarModal('modal-lista-comunidad');
         verPerfilVecino(vecino);
     });
-
     const avatar = document.createElement('span');
     avatar.className = 'avatar-letras avatar-verde';
     const imagenVecino = vecino.fotoURL || vecino.photoURL || vecino.fotoBase64;
@@ -1015,7 +990,6 @@ function crearFilaMiembro(vecino) {
     badge.className = `badge ${vecino.estado === 'Activo' ? 'badge-activo' : 'badge-inactivo'}`;
     badge.textContent = rol;
     info.append(nombreElemento, badge);
-
     const flecha = document.createElement('i');
     flecha.className = 'fa-solid fa-chevron-right icono-flecha';
     flecha.setAttribute('aria-hidden', 'true');
@@ -1026,7 +1000,6 @@ function crearFilaMiembro(vecino) {
 function crearFilaAnuncio(anuncio) {
     const fila = document.createElement('article');
     fila.className = 'item-anuncio';
-
     const info = document.createElement('div');
     info.className = 'anuncio-info';
     const titulo = document.createElement('h4');
@@ -1084,7 +1057,6 @@ async function guardarAnuncio() {
 
     try {
         await window.coalertaData.createCommunityAnnouncement({ title: titulo, description: descripcion });
-
         cerrarModal('modal-publicar');
         document.getElementById('anuncio-titulo').value = '';
         document.getElementById('anuncio-desc').value = '';
@@ -1157,7 +1129,6 @@ async function procesarUnion() {
 
     try {
         await window.coalertaData.joinCommunity(codigoIngresado);
-
         alert(usuarioActual.rol === 'seguridad'
             ? 'Te uniste a la comunidad. Para mostrar tu ubicación como serenazgo en el mapa, activa “Compartir ubicación de serenazgo” desde tu panel de seguridad.'
             : '¡Te has unido exitosamente a la comunidad!');
@@ -1173,12 +1144,10 @@ async function procesarUnion() {
 function abrirConfirmacionSalida() {
     const role = usuarioActual?.rol;
     if (!usuarioActual?.comunidadId || !['vecino', 'seguridad'].includes(role)) return;
-
     const modal = document.getElementById('modal-salir-comunidad');
     const cancelButton = document.getElementById('btn-cancelar-salida');
     const status = document.getElementById('estado-salida-comunidad');
     if (!modal || !cancelButton || !status) return;
-
     elementoEnfoqueAntesDeSalir = document.activeElement;
     status.textContent = '';
     modal.classList.add('activo');
@@ -1206,7 +1175,6 @@ async function confirmarSalidaComunidad() {
     const confirmButton = document.getElementById('btn-confirmar-salida');
     const status = document.getElementById('estado-salida-comunidad');
     if (!confirmButton || !status) return;
-
     confirmButton.disabled = true;
     if (cancelButton) cancelButton.disabled = true;
     status.textContent = 'Procesando tu salida de la comunidad…';
@@ -1259,7 +1227,6 @@ function actualizarDatosSidebar() {
     const primerNombre = String(usuarioActual.nombre || 'usuario').trim().split(/\s+/)[0];
     if (nombre) nombre.textContent = `Hola, ${primerNombre}`;
     if (rol) rol.textContent = formatearRolVisible(usuarioActual);
-
     const imagen = document.getElementById('sidebarAvatarImg');
     const icono = document.getElementById('sidebarAvatarIcon');
     const foto = usuarioActual.fotoBase64 || usuarioActual.fotoURL || usuarioActual.photoURL;
@@ -1279,7 +1246,6 @@ function mostrarPerfilLocal() {
         if (localStorage.getItem('coalertaSesion') !== 'activa') return;
         const usuarioLocal = JSON.parse(localStorage.getItem('coalerta_usuario') || '{}');
         if (!usuarioLocal || typeof usuarioLocal !== 'object') return;
-
         usuarioActual = {
             ...usuarioLocal,
             nombre: usuarioLocal.nombre ||

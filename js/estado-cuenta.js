@@ -4,14 +4,12 @@ import { auth, db } from "./firebase-config.js?v=spark-direct-firestore-1";
 
 document.addEventListener("DOMContentLoaded", function () {
     let unsubscribe = null;
-
     onAuthStateChanged(auth, function (user) {
         if (unsubscribe) {
             unsubscribe();
             unsubscribe = null;
         }
         if (!user) return;
-
         unsubscribe = onSnapshot(doc(db, "usuarios", user.uid), async function (document) {
             if (!document.exists() || document.data().activo !== false) return;
             try {
